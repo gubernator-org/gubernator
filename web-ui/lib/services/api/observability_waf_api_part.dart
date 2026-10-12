@@ -7,7 +7,7 @@ class ObservabilityWafApi {
 
   /// Fetches active SLO definitions and error budgets.
   static Future<List<SLOItem>> fetchSLOs() async {
-    final response = await http.get(Uri.parse('/api/slo'));
+    final response = await http.get(Uri.parse('/api/slo'), headers: authHeaders);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       if (decoded is List) {
@@ -19,13 +19,13 @@ class ObservabilityWafApi {
 
   /// Force syncs SLO rules with Prometheus.
   static Future<bool> syncSLOs() async {
-    final response = await http.post(Uri.parse('/api/slo/sync'));
+    final response = await http.post(Uri.parse('/api/slo/sync'), headers: authHeaders);
     return response.statusCode == 200;
   }
 
   /// Fetches aggregated User Journeys.
   static Future<List<UserJourney>> fetchUserJourneys() async {
-    final response = await http.get(Uri.parse('/api/slo/journeys'));
+    final response = await http.get(Uri.parse('/api/slo/journeys'), headers: authHeaders);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       if (decoded is List) {
@@ -37,7 +37,7 @@ class ObservabilityWafApi {
 
   /// Fetches deployment events correlation.
   static Future<List<SLOCorrelationEvent>> fetchSLOCorrelations() async {
-    final response = await http.get(Uri.parse('/api/slo/correlation'));
+    final response = await http.get(Uri.parse('/api/slo/correlation'), headers: authHeaders);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       if (decoded is List) {
@@ -51,7 +51,7 @@ class ObservabilityWafApi {
   static Future<List<SLOValidationItem>> validateSLO(String composeRaw) async {
     final response = await http.post(
       Uri.parse('/api/slo/validate'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'compose_raw': composeRaw}),
     );
     if (response.statusCode == 200) {
@@ -65,7 +65,7 @@ class ObservabilityWafApi {
 
   /// Fetches historical trend points for an SLO.
   static Future<List<SLOHistoryPoint>> fetchSLOHistory(String serviceId, String timeRange) async {
-    final response = await http.get(Uri.parse('/api/slo/history?service_id=$serviceId&range=$timeRange'));
+    final response = await http.get(Uri.parse('/api/slo/history?service_id=$serviceId&range=$timeRange'), headers: authHeaders);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       if (decoded is List) {
@@ -77,7 +77,7 @@ class ObservabilityWafApi {
 
   /// Fetches RED metrics for a service.
   static Future<SLOREDMetrics> fetchSLOREDMetrics(String serviceId) async {
-    final response = await http.get(Uri.parse('/api/slo/red?service_id=$serviceId'));
+    final response = await http.get(Uri.parse('/api/slo/red?service_id=$serviceId'), headers: authHeaders);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       if (decoded is Map<String, dynamic>) {
@@ -102,7 +102,7 @@ class ObservabilityWafApi {
   }) async {
     final response = await http.post(
       Uri.parse('/api/slo/edit'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({
         'service_id': serviceId,
         'enable': enable,
@@ -121,13 +121,13 @@ class ObservabilityWafApi {
 
   /// Disables/deletes an SLO configuration for a service.
   static Future<bool> deleteSLO(String serviceId) async {
-    final response = await http.delete(Uri.parse('/api/slo/$serviceId'));
+    final response = await http.delete(Uri.parse('/api/slo/$serviceId'), headers: authHeaders);
     return response.statusCode == 200;
   }
 
   /// Fetches SLO notification configuration (Email, Webhook).
   static Future<Map<String, dynamic>> fetchSLONotifyConfig() async {
-    final response = await http.get(Uri.parse('/api/slo/notify/config'));
+    final response = await http.get(Uri.parse('/api/slo/notify/config'), headers: authHeaders);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -138,7 +138,7 @@ class ObservabilityWafApi {
   static Future<bool> saveSLONotifyConfig(Map<String, dynamic> config) async {
     final response = await http.post(
       Uri.parse('/api/slo/notify/config'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode(config),
     );
     return response.statusCode == 200;
@@ -148,7 +148,7 @@ class ObservabilityWafApi {
   static Future<Map<String, dynamic>> testSLONotify(String channel) async {
     final response = await http.post(
       Uri.parse('/api/slo/notify/test'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'channel': channel}),
     );
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -163,7 +163,7 @@ class ObservabilityWafApi {
   /// Caddy: Fetches Caddy status and stats for a given node.
   static Future<Map<String, dynamic>> fetchCaddyStatus({String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/status${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders);
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
@@ -173,7 +173,7 @@ class ObservabilityWafApi {
   /// Caddy: Fetches dynamic routes matrix.
   static Future<List<dynamic>> fetchCaddyRoutes({String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/routes${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['routes'] ?? [];
@@ -184,7 +184,7 @@ class ObservabilityWafApi {
   /// Caddy: Fetches TLS certs list.
   static Future<List<dynamic>> fetchCaddyCerts({String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/certs${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['certificates'] ?? [];
@@ -195,7 +195,7 @@ class ObservabilityWafApi {
   /// Caddy: Fetches tail logs.
   static Future<List<String>> fetchCaddyLogs({String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/logs${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final List raw = data['logs'] ?? [];
@@ -207,7 +207,7 @@ class ObservabilityWafApi {
   /// Caddy: Fetches Prometheus metrics.
   static Future<Map<String, dynamic>> fetchCaddyMetrics({String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/metrics${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders);
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
@@ -218,7 +218,7 @@ class ObservabilityWafApi {
   static Future<String> formatCaddyfile(String caddyfile) async {
     final response = await http.post(
       Uri.parse('/api/caddy/fmt'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'caddyfile': caddyfile}),
     );
     if (response.statusCode == 200) {
@@ -231,7 +231,7 @@ class ObservabilityWafApi {
   /// Caddy: Inspects full X.509 certificate details for a domain.
   static Future<Map<String, dynamic>?> inspectCaddyCert(String domain, {String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/certs/inspect?domain=${Uri.encodeComponent(domain)}${nodeId != null ? '&node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['certificate'];
@@ -244,7 +244,7 @@ class ObservabilityWafApi {
     final uri = Uri.parse('/api/caddy/certs/renew${nodeId != null ? '?node_id=$nodeId' : ''}');
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'domain': domain}),
     );
     return jsonDecode(response.body);
@@ -260,7 +260,7 @@ class ObservabilityWafApi {
     final uri = Uri.parse('/api/caddy/certs/custom${nodeId != null ? '?node_id=$nodeId' : ''}');
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({
         'domain': domain,
         'cert_pem': certPem,
@@ -273,7 +273,7 @@ class ObservabilityWafApi {
   /// Caddy: Prunes orphaned certificates no longer referenced in Caddyfile.
   static Future<Map<String, dynamic>> pruneOrphanedCaddyCerts({String? nodeId}) async {
     final uri = Uri.parse('/api/caddy/certs/orphaned${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.delete(uri);
+    final response = await http.delete(uri, headers: authHeaders);
     return jsonDecode(response.body);
   }
 

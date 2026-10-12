@@ -528,3 +528,12 @@ func seedInitialWAFConfig() {
 		}
 	}
 }
+
+// EnsureDefaultAdminUser guarantees at least the default local admin user exists in the database.
+func EnsureDefaultAdminUser() {
+	if DB == nil {
+		return
+	}
+	seedInitialLocalUser()
+}
+

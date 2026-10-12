@@ -9,8 +9,11 @@ import (
 
 	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
 	"github.com/mario-ezquerro/gubernator/internal/autoscaler"
+	"github.com/mario-ezquerro/gubernator/internal/caddy"
+	"github.com/mario-ezquerro/gubernator/internal/coredns"
 	"github.com/mario-ezquerro/gubernator/internal/db"
 	"github.com/mario-ezquerro/gubernator/internal/docker"
+	"github.com/mario-ezquerro/gubernator/internal/monitor"
 )
 
 // StartSelfHealingWatchdog periodically reconciles all services across cluster nodes.
@@ -50,7 +53,22 @@ func ReconcileClusterServices() (prunedCount int, rescheduledCount int) {
 		return 0, 0
 	}
 
-	validContainerNames := make(map[string]bool)
+	validContainerNames := map[string]bool{
+		"gbnt-manager":            true,
+		"gbnt-worker":             true,
+		"gbnt-coredns":            true,
+		"gbnt-caddy":              true,
+		"gbnt-monitor-cadvisor":   true,
+		"gbnt-monitor-prometheus": true,
+		"gbnt-monitor-grafana":    true,
+		"gbnt-monitor-loki":       true,
+		"gbnt-monitor-promtail":   true,
+		"gbnt-monitor-jaeger":     true,
+		"gbnt-monitor-scope":      true,
+	}
+
+	// Self-heal Core stack (CoreDNS + Caddy) if stopped after node reboot
+	reconcileSystemStacks(&rescheduledCount)
 
 	for _, stack := range stacks {
 		// Skip system stacks (Caddy/CoreDNS, SRE monitor, and Scope Net-Topology have their own dedicated sync lifecycles)
@@ -76,6 +94,96 @@ func ReconcileClusterServices() (prunedCount int, rescheduledCount int) {
 	}
 
 	return prunedCount, rescheduledCount
+}
+
+// reconcileSystemStacks ensures CoreDNS, Caddy, and SRE Monitor containers are running after a node reboot
+// unless the administrator explicitly stopped the stack.
+func reconcileSystemStacks(rescheduledCount *int) {
+	// 1. Check Core stack (CoreDNS + Caddy)
+	var coreStack db.Stack
+	if err := db.DB.First(&coreStack, "id = ?", coredns.CoreStackID).Error; err == nil {
+		// Check if CoreDNS container is running
+		dnsStatus, dnsErr := docker.InspectContainerStatus("node-local-manager", coredns.ContainerName)
+		if dnsErr != nil || dnsStatus != "running" {
+			var dnsTask db.Task
+			explicitlyStopped := false
+			if err := db.DB.First(&dnsTask, "id = ?", "core-task-coredns").Error; err == nil && dnsTask.Status == "stopped" {
+				explicitlyStopped = true
+			}
+			if !explicitlyStopped {
+				slog.Warn("watchdog: gbnt-coredns is not running, auto-restarting CoreDNS container")
+				if err := coredns.EnsureRunning(); err == nil {
+					_ = coredns.RegisterInDB(db.DB)
+					*rescheduledCount++
+				}
+			}
+		} else {
+			// Ensure task status in DB reflects running state
+			db.DB.Model(&db.Task{}).Where("id = ? AND status != ?", "core-task-coredns", "running").Updates(map[string]interface{}{
+				"status":     "running",
+				"updated_at": time.Now(),
+			})
+		}
+
+		caddyStatus, caddyErr := docker.InspectContainerStatus("node-local-manager", caddy.ContainerName)
+		if caddyErr != nil || caddyStatus != "running" {
+			var caddyTask db.Task
+			explicitlyStopped := false
+			if err := db.DB.First(&caddyTask, "id = ?", "core-task-caddy").Error; err == nil && caddyTask.Status == "stopped" {
+				explicitlyStopped = true
+			}
+			if !explicitlyStopped {
+				slog.Warn("watchdog: gbnt-caddy is not running, auto-restarting Caddy container")
+				if err := caddy.EnsureRunning(); err == nil {
+					_ = coredns.RegisterInDB(db.DB)
+					*rescheduledCount++
+				}
+			}
+		} else {
+			db.DB.Model(&db.Task{}).Where("id = ? AND status != ?", "core-task-caddy", "running").Updates(map[string]interface{}{
+				"status":     "running",
+				"updated_at": time.Now(),
+			})
+		}
+	}
+
+	// 2. Check SRE Monitor stack containers (Jaeger, Grafana, Prometheus, Loki, Promtail, cAdvisor)
+	var sreStack db.Stack
+	if err := db.DB.First(&sreStack, "id = ?", monitor.SREStackID).Error; err == nil {
+		sreContainers := []struct {
+			taskID string
+			name   string
+		}{
+			{"sre-task-jaeger", "gbnt-monitor-jaeger"},
+			{"sre-task-grafana", "gbnt-monitor-grafana"},
+			{"sre-task-prometheus", "gbnt-monitor-prometheus"},
+			{"sre-task-loki", "gbnt-monitor-loki"},
+			{"sre-task-promtail", "gbnt-monitor-promtail"},
+			{"sre-task-cadvisor", "gbnt-monitor-cadvisor"},
+		}
+		for _, sc := range sreContainers {
+			var t db.Task
+			if err := db.DB.First(&t, "id = ?", sc.taskID).Error; err == nil && t.Status == "stopped" {
+				continue // Explicitly stopped by user
+			}
+			st, err := docker.InspectContainerStatus("node-local-manager", sc.name)
+			if err == nil && (st == "exited" || st == "created" || st == "dead") {
+				slog.Warn("watchdog: SRE container exited after reboot, auto-starting", "container", sc.name)
+				if docker.ExecuteNodeDockerAction("node-local-manager", sc.name, "start") == nil {
+					db.DB.Model(&db.Task{}).Where("id = ?", sc.taskID).Updates(map[string]interface{}{
+						"status":     "running",
+						"updated_at": time.Now(),
+					})
+					*rescheduledCount++
+				}
+			} else if err == nil && st == "running" {
+				db.DB.Model(&db.Task{}).Where("id = ? AND status != ?", sc.taskID, "running").Updates(map[string]interface{}{
+					"status":     "running",
+					"updated_at": time.Now(),
+				})
+			}
+		}
+	}
 }
 
 // ReconcileSingleStack reconciles a specific stack by ID or name,

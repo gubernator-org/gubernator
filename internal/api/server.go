@@ -478,9 +478,9 @@ func startWatchtowers(ctx context.Context) {
 			db.DB.Model(&db.Task{}).Where("node_id = ?", dn.ID).Updates(map[string]interface{}{"status": "dead"})
 		}
 
-		// Garbage collect tasks that have been 'dead' for more than 2 minutes
+		// Garbage collect application tasks that have been 'dead' for more than 2 minutes (preserve system tasks)
 		taskGCThreshold := time.Now().Add(-2 * time.Minute)
-		db.DB.Where("status = ? AND updated_at < ?", "dead", taskGCThreshold).Delete(&db.Task{})
+		db.DB.Where("status = ? AND updated_at < ? AND id NOT LIKE 'core-task-%' AND id NOT LIKE 'sre-task-%'", "dead", taskGCThreshold).Delete(&db.Task{})
 	}
 }
 

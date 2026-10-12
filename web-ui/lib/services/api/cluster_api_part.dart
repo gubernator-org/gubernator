@@ -353,7 +353,7 @@ class ClusterApi {
   static Future<bool> migrateStack(String stackId, String targetNode) async {
     final response = await http.post(
       Uri.parse('/api/stack/$stackId/migrate'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'target_node': targetNode}),
     );
     return response.statusCode == 200;
@@ -368,7 +368,7 @@ class ClusterApi {
   /// Fetches cluster join info and commands
   static Future<NodeJoinInfo?> fetchJoinInfo() async {
     try {
-      final response = await http.get(Uri.parse('/api/node/join-info'));
+      final response = await http.get(Uri.parse('/api/node/join-info'), headers: authHeaders);
       if (response.statusCode == 200) {
         return NodeJoinInfo.fromJson(jsonDecode(response.body));
       }
@@ -389,7 +389,7 @@ class ClusterApi {
     try {
       final response = await http.post(
         Uri.parse('/api/node/add'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders,
         body: jsonEncode({
           'host': host,
           'port': port,
@@ -435,7 +435,7 @@ class ClusterApi {
   static Future<bool> taskAction(String id, String action) async {
     final response = await http.post(
       Uri.parse('/api/task/$id/action'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'action': action}),
     );
     return response.statusCode == 200;
@@ -443,7 +443,7 @@ class ClusterApi {
 
   /// Gets tail logs for a task
   static Future<String> taskLogs(String id) async {
-    final response = await http.get(Uri.parse('/api/task/$id/logs'));
+    final response = await http.get(Uri.parse('/api/task/$id/logs'), headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['logs'] ?? '';
@@ -453,7 +453,7 @@ class ClusterApi {
 
   /// Gets inspect JSON for a task
   static Future<String> taskInspect(String id) async {
-    final response = await http.get(Uri.parse('/api/task/$id/inspect'));
+    final response = await http.get(Uri.parse('/api/task/$id/inspect'), headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return const JsonEncoder.withIndent('  ').convert(data);
@@ -463,7 +463,7 @@ class ClusterApi {
 
   /// Gets the compose YAML for a specific stack.
   static Future<String> getStackCompose(String id) async {
-    final response = await http.get(Uri.parse('/api/stack/$id/compose'));
+    final response = await http.get(Uri.parse('/api/stack/$id/compose'), headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['compose'] ?? '';
@@ -475,7 +475,7 @@ class ClusterApi {
   static Future<bool> updateStackCompose(String id, String compose) async {
     final response = await http.put(
       Uri.parse('/api/stack/$id/compose'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'compose': compose}),
     );
     return response.statusCode == 200;
@@ -483,7 +483,7 @@ class ClusterApi {
 
   /// Fetches user settings from the backend.
   static Future<Map<String, dynamic>> getSettings() async {
-    final response = await http.get(Uri.parse('/api/settings'));
+    final response = await http.get(Uri.parse('/api/settings'), headers: authHeaders);
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
@@ -494,7 +494,7 @@ class ClusterApi {
   static Future<bool> updateSettings(Map<String, dynamic> settings) async {
     final response = await http.put(
       Uri.parse('/api/settings'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode(settings),
     );
     return response.statusCode == 200;
@@ -505,7 +505,7 @@ class ClusterApi {
       String currentPassword, String newPassword) async {
     final response = await http.put(
       Uri.parse('/api/settings/password'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({
         'current_password': currentPassword,
         'new_password': newPassword,
@@ -519,7 +519,7 @@ class ClusterApi {
   static Future<bool> updateNodeRole(String id, String role) async {
     final response = await http.post(
       Uri.parse('/api/node/$id/role'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'role': role}),
     );
     return response.statusCode == 200;
@@ -545,7 +545,7 @@ class ClusterApi {
   /// Synchronizes the active authentication token to the remote worker node via SSH.
   static Future<Map<String, dynamic>> syncNodeToken(String id) async {
     try {
-      final response = await http.post(Uri.parse('/api/node/$id/sync-token'));
+      final response = await http.post(Uri.parse('/api/node/$id/sync-token'), headers: authHeaders);
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
@@ -558,13 +558,13 @@ class ClusterApi {
 
   /// Commands the node to leave the cluster.
   static Future<bool> leaveNode(String id) async {
-    final response = await http.post(Uri.parse('/api/node/$id/leave'));
+    final response = await http.post(Uri.parse('/api/node/$id/leave'), headers: authHeaders);
     return response.statusCode == 200;
   }
 
   /// Triggers a reboot for the node.
   static Future<bool> rebootNode(String id) async {
-    final response = await http.post(Uri.parse('/api/node/$id/reboot'));
+    final response = await http.post(Uri.parse('/api/node/$id/reboot'), headers: authHeaders);
     return response.statusCode == 200;
   }
 
@@ -572,7 +572,7 @@ class ClusterApi {
   static Future<bool> updateNodeLabels(String id, Map<String, String> labels) async {
     final response = await http.post(
       Uri.parse('/api/node/$id/labels'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'labels': labels}),
     );
     return response.statusCode == 200;
@@ -580,7 +580,7 @@ class ClusterApi {
 
   /// Gets the CoreDNS configuration (Corefile).
   static Future<String> getCoreDNSConfig() async {
-    final response = await http.get(Uri.parse('/api/coredns/config'));
+    final response = await http.get(Uri.parse('/api/coredns/config'), headers: authHeaders);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['config'] ?? '';
@@ -592,7 +592,7 @@ class ClusterApi {
   static Future<bool> updateCoreDNSConfig(String config) async {
     final response = await http.put(
       Uri.parse('/api/coredns/config'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'config': config}),
     );
     return response.statusCode == 200;
@@ -600,16 +600,25 @@ class ClusterApi {
 
   /// Fetches CoreDNS status and memory usage.
   static Future<CoreDNSStatusInfo> fetchCoreDNSStatusInfo() async {
-    final response = await http.get(Uri.parse('/api/coredns/status'));
+    final response = await http.get(Uri.parse('/api/coredns/status'), headers: authHeaders);
     if (response.statusCode == 200) {
       return CoreDNSStatusInfo.fromJson(jsonDecode(response.body));
     }
     return CoreDNSStatusInfo(status: 'stopped', uptimeSeconds: 0, memBytes: 0, listeningPort: 5354, forwarders: [], totalRecords: 0);
   }
 
+  /// Restarts the CoreDNS container and refreshes DNS hosts.
+  static Future<CoreDNSStatusInfo> restartCoreDNS() async {
+    final response = await http.post(Uri.parse('/api/coredns/restart'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      return CoreDNSStatusInfo.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to restart CoreDNS (${response.statusCode})');
+  }
+
   /// Fetches custom static DNS records.
   static Future<List<CustomDNSRecord>> fetchCustomDNSRecords() async {
-    final response = await http.get(Uri.parse('/api/coredns/custom-records'));
+    final response = await http.get(Uri.parse('/api/coredns/custom-records'), headers: authHeaders);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       if (decoded is List) {
@@ -628,7 +637,7 @@ class ClusterApi {
   }) async {
     final response = await http.post(
       Uri.parse('/api/coredns/custom-records'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({
         'domain': domain,
         'ip': ip,
@@ -641,7 +650,7 @@ class ClusterApi {
 
   /// Deletes a custom static DNS record.
   static Future<bool> deleteCustomDNSRecord(String id) async {
-    final response = await http.delete(Uri.parse('/api/coredns/custom-records/$id'));
+    final response = await http.delete(Uri.parse('/api/coredns/custom-records/$id'), headers: authHeaders);
     return response.statusCode == 200;
   }
 
@@ -652,7 +661,7 @@ class ClusterApi {
   }) async {
     final response = await http.post(
       Uri.parse('/api/coredns/dig'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({
         'domain': domain,
         'record_type': recordType,
@@ -679,7 +688,7 @@ class ClusterApi {
     try {
       final response = await http.post(
         Uri.parse('/api/coredns/curl'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders,
         body: jsonEncode({
           'hostname': hostname,
           'ip': ip,
@@ -732,7 +741,7 @@ class ClusterApi {
     try {
       final response = await http.post(
         Uri.parse('/api/coredns/ping'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders,
         body: jsonEncode({
           'hostname': hostname,
           'ip': ip,
@@ -775,7 +784,7 @@ class ClusterApi {
   /// Fetches the configured base cluster domain.
   static Future<String> fetchClusterDomain() async {
     try {
-      final response = await http.get(Uri.parse('/api/cluster/domain'));
+      final response = await http.get(Uri.parse('/api/cluster/domain'), headers: authHeaders);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['cluster_domain'] ?? 'gbnt.local';
@@ -788,7 +797,7 @@ class ClusterApi {
   static Future<bool> updateClusterDomain(String domain) async {
     final response = await http.put(
       Uri.parse('/api/cluster/domain'),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'cluster_domain': domain}),
     );
     return response.statusCode == 200;
@@ -796,7 +805,7 @@ class ClusterApi {
 
   /// Fetches status of Weave Scope Network Topology superpower.
   static Future<Map<String, dynamic>> fetchScopeStatus() async {
-    final response = await http.get(Uri.parse('/api/scope/status'));
+    final response = await http.get(Uri.parse('/api/scope/status'), headers: authHeaders);
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
@@ -858,7 +867,7 @@ class ClusterApi {
   /// Fetches live status of an ongoing or recent update.
   static Future<Map<String, dynamic>> fetchUpdateStatus() async {
     try {
-      final response = await http.get(Uri.parse('/api/update/status'));
+      final response = await http.get(Uri.parse('/api/update/status'), headers: authHeaders);
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }

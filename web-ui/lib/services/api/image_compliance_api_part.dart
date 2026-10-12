@@ -392,18 +392,14 @@ class ImageComplianceApi {
 
   /// Fetches Spanish ENS (RD 311/2022) compliance evaluation summary.
   static Future<ENSSummaryModel?> fetchENSStatus() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/ens/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return ENSSummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
+    final response = await http.get(
+      Uri.parse('/api/security/ens/status'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return ENSSummaryModel.fromJson(jsonDecode(response.body));
     }
+    throw Exception('Failed to load ENS compliance status (HTTP ${response.statusCode})');
   }
 
   /// Downloads the technical ENS compliance and evidence report in Markdown or JSON.
@@ -424,18 +420,14 @@ class ImageComplianceApi {
 
   /// Fetches European NIS 2 Directive (EU 2022/2555) compliance evaluation summary.
   static Future<NIS2SummaryModel?> fetchNIS2Status() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/nis2/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return NIS2SummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
+    final response = await http.get(
+      Uri.parse('/api/security/nis2/status'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return NIS2SummaryModel.fromJson(jsonDecode(response.body));
     }
+    throw Exception('Failed to load NIS 2 compliance status (HTTP ${response.statusCode})');
   }
 
   /// Downloads the technical NIS 2 compliance and evidence report in Markdown or JSON.
@@ -456,18 +448,14 @@ class ImageComplianceApi {
 
   /// Fetches CIS Docker Benchmark v1.6.0 compliance assessment summary.
   static Future<CISDockerSummaryModel?> fetchCISDockerStatus() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/cis-docker/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return CISDockerSummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
+    final response = await http.get(
+      Uri.parse('/api/security/cis-docker/status'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return CISDockerSummaryModel.fromJson(jsonDecode(response.body));
     }
+    throw Exception('Failed to load CIS Docker Benchmark status (HTTP ${response.statusCode})');
   }
 
   /// Downloads the technical CIS Docker Benchmark compliance report in Markdown or JSON.
@@ -488,18 +476,14 @@ class ImageComplianceApi {
 
   /// Fetches ISO/IEC 27001:2022 Annex A compliance evaluation.
   static Future<ISO27001SummaryModel?> fetchISO27001Status() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/iso27001/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return ISO27001SummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
+    final response = await http.get(
+      Uri.parse('/api/security/iso27001/status'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return ISO27001SummaryModel.fromJson(jsonDecode(response.body));
     }
+    throw Exception('Failed to load ISO/IEC 27001 compliance status (HTTP ${response.statusCode})');
   }
 
   /// Downloads the formal ISO/IEC 27001 Statement of Applicability audit report.
@@ -520,18 +504,14 @@ class ImageComplianceApi {
 
   /// Fetches cluster compliance status against EU DORA (Regulation 2022/2554).
   static Future<DORASummaryModel?> fetchDORAStatus() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/dora/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return DORASummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
+    final response = await http.get(
+      Uri.parse('/api/security/dora/status'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return DORASummaryModel.fromJson(jsonDecode(response.body));
     }
+    throw Exception('Failed to load EU DORA compliance status (HTTP ${response.statusCode})');
   }
 
   /// Downloads the technical DORA operational resilience audit report.

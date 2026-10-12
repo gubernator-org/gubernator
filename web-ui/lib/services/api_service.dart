@@ -205,6 +205,9 @@ class ApiService {
   /// Fetches CoreDNS status and memory usage.
   static Future<CoreDNSStatusInfo> fetchCoreDNSStatusInfo() => ClusterApi.fetchCoreDNSStatusInfo();
 
+  /// Restarts CoreDNS and refreshes DNS records.
+  static Future<CoreDNSStatusInfo> restartCoreDNS() => ClusterApi.restartCoreDNS();
+
   /// Fetches custom static DNS records.
   static Future<List<CustomDNSRecord>> fetchCustomDNSRecords() => ClusterApi.fetchCustomDNSRecords();
 

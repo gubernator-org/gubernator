@@ -55,6 +55,12 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && mounted) {
+        setState(() {});
+        _fetchFlowsAndStatsSilently();
+      }
+    });
     _loadAllData();
     _startTimer();
   }
@@ -91,60 +97,78 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
 
   Future<void> _loadAllData() async {
     setState(() => _loading = true);
-    try {
-      final statsFuture = ApiService.fetchEbpfStats();
-      final flowsFuture = ApiService.fetchEbpfFlows(
-        limit: _limit,
-        protocol: _selectedProtocol,
-        status: _selectedStatus,
-        query: _searchCtrl.text.trim(),
-      );
-      final topoFuture = ApiService.fetchEbpfTopology();
+    EbpfStats? stats;
+    List<EbpfFlow>? flows;
+    EbpfTopology? topo;
 
-      final results = await Future.wait([statsFuture, flowsFuture, topoFuture]);
-      if (mounted) {
-        setState(() {
-          _stats = results[0] as EbpfStats;
-          _flows = results[1] as List<EbpfFlow>;
-          _topology = results[2] as EbpfTopology;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+    await Future.wait([
+      () async {
+        try {
+          stats = await ApiService.fetchEbpfStats();
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          flows = await ApiService.fetchEbpfFlows(
+            limit: _limit,
+            protocol: _selectedProtocol,
+            status: _selectedStatus,
+            query: _searchCtrl.text.trim(),
+          );
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          topo = await ApiService.fetchEbpfTopology();
+        } catch (_) {}
+      }(),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        if (stats != null) _stats = stats;
+        if (flows != null) _flows = flows!;
+        if (topo != null) _topology = topo;
+        _loading = false;
+      });
     }
   }
 
   Future<void> _fetchFlowsAndStatsSilently() async {
-    try {
-      final statsFuture = ApiService.fetchEbpfStats();
-      final flowsFuture = ApiService.fetchEbpfFlows(
-        limit: _limit,
-        protocol: _selectedProtocol,
-        status: _selectedStatus,
-        query: _searchCtrl.text.trim(),
-      );
-      final topoFuture = _tabController.index == 1 ? ApiService.fetchEbpfTopology() : null;
+    EbpfStats? stats;
+    List<EbpfFlow>? flows;
+    EbpfTopology? topo;
 
-      final stats = await statsFuture;
-      final flows = await flowsFuture;
-      EbpfTopology? topo;
-      if (topoFuture != null) {
-        topo = await topoFuture;
-      }
+    await Future.wait([
+      () async {
+        try {
+          stats = await ApiService.fetchEbpfStats();
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          flows = await ApiService.fetchEbpfFlows(
+            limit: _limit,
+            protocol: _selectedProtocol,
+            status: _selectedStatus,
+            query: _searchCtrl.text.trim(),
+          );
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          topo = await ApiService.fetchEbpfTopology();
+        } catch (_) {}
+      }(),
+    ]);
 
-      if (mounted) {
-        setState(() {
-          _stats = stats;
-          _flows = flows;
-          if (topo != null) {
-            _topology = topo;
-          }
-        });
-      }
-    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        if (stats != null) _stats = stats;
+        if (flows != null) _flows = flows!;
+        if (topo != null) _topology = topo;
+      });
+    }
   }
 
   void _openSimulationDialog() {

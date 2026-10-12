@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,10 +46,42 @@ func getJWTSecret() []byte {
 			jwtSecretKey = []byte(envSecret)
 			return
 		}
-		// Generate random 256-bit secret for this runtime instance
+		if apiToken := os.Getenv("GBNT_API_TOKEN"); apiToken != "" {
+			jwtSecretKey = []byte("gbnt-jwt-" + apiToken)
+			return
+		}
+
+		// Try loading or persisting secret in /data/jwt.secret or ~/.gbnt/jwt.secret
+		var secretPaths []string
+		if st, err := os.Stat("/data"); err == nil && st.IsDir() {
+			secretPaths = append(secretPaths, "/data/jwt.secret")
+		}
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
+			secretPaths = append(secretPaths, filepath.Join(home, ".gbnt", "jwt.secret"))
+		}
+
+		for _, sp := range secretPaths {
+			if raw, err := os.ReadFile(sp); err == nil {
+				trimmed := strings.TrimSpace(string(raw))
+				if len(trimmed) >= 32 {
+					jwtSecretKey = []byte(trimmed)
+					return
+				}
+			}
+		}
+
+		// Generate random 256-bit secret and persist it to disk so sessions survive node reboots
 		b := make([]byte, 32)
 		_, _ = rand.Read(b)
-		jwtSecretKey = b
+		hexSecret := hex.EncodeToString(b)
+		jwtSecretKey = []byte(hexSecret)
+
+		for _, sp := range secretPaths {
+			_ = os.MkdirAll(filepath.Dir(sp), 0700)
+			if err := os.WriteFile(sp, []byte(hexSecret), 0600); err == nil {
+				break
+			}
+		}
 	})
 	return jwtSecretKey
 }

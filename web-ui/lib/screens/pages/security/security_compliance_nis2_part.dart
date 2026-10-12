@@ -13,7 +13,7 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
         const SizedBox(height: 16),
         // Top Segmented Pill Selector between Standards
         Container(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
@@ -21,8 +21,9 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
               color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.2),
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
               _buildStandardPill(
                 isDark: isDark,
@@ -31,12 +32,11 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                 isSelected: _selectedComplianceStandard == "NIS2",
                 onTap: () {
                   _updateState(() => _selectedComplianceStandard = "NIS2");
-                  if (_nis2Summary == null && !_nis2Loading) {
+                  if (_nis2Summary == null) {
                     _loadNIS2Status();
                   }
                 },
               ),
-              const SizedBox(width: 6),
               _buildStandardPill(
                 isDark: isDark,
                 primaryColor: const Color(0xFF6366F1),
@@ -44,12 +44,11 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                 isSelected: _selectedComplianceStandard == "CIS",
                 onTap: () {
                   _updateState(() => _selectedComplianceStandard = "CIS");
-                  if (_cisSummary == null && !_cisLoading) {
+                  if (_cisSummary == null) {
                     _loadCISStatus();
                   }
                 },
               ),
-              const SizedBox(width: 6),
               _buildStandardPill(
                 isDark: isDark,
                 primaryColor: const Color(0xFF14B8A6),
@@ -57,12 +56,11 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                 isSelected: _selectedComplianceStandard == "ENS",
                 onTap: () {
                   _updateState(() => _selectedComplianceStandard = "ENS");
-                  if (_ensSummary == null && !_ensLoading) {
+                  if (_ensSummary == null) {
                     _loadENSStatus();
                   }
                 },
               ),
-              const SizedBox(width: 6),
               _buildStandardPill(
                 isDark: isDark,
                 primaryColor: const Color(0xFF8B5CF6),
@@ -70,12 +68,11 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                 isSelected: _selectedComplianceStandard == "ISO27001",
                 onTap: () {
                   _updateState(() => _selectedComplianceStandard = "ISO27001");
-                  if (_isoSummary == null && !_isoLoading) {
+                  if (_isoSummary == null) {
                     _loadISO27001Status();
                   }
                 },
               ),
-              const SizedBox(width: 6),
               _buildStandardPill(
                 isDark: isDark,
                 primaryColor: const Color(0xFFF59E0B),
@@ -83,7 +80,7 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                 isSelected: _selectedComplianceStandard == "DORA",
                 onTap: () {
                   _updateState(() => _selectedComplianceStandard = "DORA");
-                  if (_doraSummary == null && !_doraLoading) {
+                  if (_doraSummary == null) {
                     _loadDORAStatus();
                   }
                 },

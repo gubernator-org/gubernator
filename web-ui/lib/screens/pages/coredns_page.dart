@@ -47,6 +47,7 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
   final TextEditingController _forwardersController = TextEditingController();
   bool _loadingConfig = false;
   bool _savingConfig = false;
+  bool _restartingCoreDNS = false;
 
   final ScrollController _autoScrollController = ScrollController();
   final ScrollController _customScrollController = ScrollController();
@@ -219,6 +220,39 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
     }
   }
 
+  Future<void> _restartCoreDNS() async {
+    setState(() => _restartingCoreDNS = true);
+    try {
+      final info = await ApiService.restartCoreDNS();
+      final ok = info.status == 'running';
+      if (mounted) {
+        setState(() {
+          _statusInfo = info;
+          _restartingCoreDNS = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              ok
+                  ? 'CoreDNS container restarted and DNS records synchronized.'
+                  : 'CoreDNS restart finished (status: ${info.status}).',
+            ),
+            backgroundColor: ok ? Colors.green.shade700 : Colors.orange.shade800,
+          ),
+        );
+        widget.onRefresh();
+        _loadSuiteData();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _restartingCoreDNS = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error restarting CoreDNS: $e')),
+        );
+      }
+    }
+  }
+
   void _updateState(VoidCallback fn) {
     if (mounted) setState(fn);
   }
@@ -240,6 +274,21 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
             value: status.toUpperCase(),
             icon: Icons.dns,
             valueColor: status == 'running' ? Colors.green : Colors.red,
+            trailing: IconButton(
+              icon: _restartingCoreDNS
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Icons.restart_alt,
+                      size: 18,
+                      color: status == 'running' ? null : Colors.orangeAccent,
+                    ),
+              tooltip: 'Restart CoreDNS Service',
+              onPressed: _restartingCoreDNS ? null : _restartCoreDNS,
+            ),
           ),
         ),
         const SizedBox(width: 16),
@@ -309,6 +358,18 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
                 ],
               ),
               const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _restartingCoreDNS ? null : _restartCoreDNS,
+                icon: _restartingCoreDNS
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.restart_alt, size: 18),
+                label: Text(_restartingCoreDNS ? 'Restarting...' : 'Restart CoreDNS'),
+              ),
+              const SizedBox(width: 12),
               OutlinedButton.icon(
                 onPressed: () {
                   widget.onRefresh();
