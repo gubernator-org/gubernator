@@ -13,6 +13,7 @@ import (
 	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
 	"github.com/mario-ezquerro/gubernator/internal/db"
 	"github.com/mario-ezquerro/gubernator/internal/docker"
+	"github.com/mario-ezquerro/gubernator/internal/examples"
 )
 
 const localManagerNodeID = "node-local-manager"
@@ -103,19 +104,48 @@ func executeRemoteWorkerTask(task db.Task, svc db.Service, node db.Node) {
 		}
 	}
 
-	// 1. Pull image on remote worker (with context timeout)
-	pullCmd := fmt.Sprintf("sudo docker pull '%s'", strings.ReplaceAll(svc.Image, "'", "'\\''"))
+	// 1. Pull image on remote worker and discover worker gbnt-coredns IP on gbnt-net
+	pullCmd := fmt.Sprintf("sudo docker network create gbnt-net 2>/dev/null || true; sudo docker pull '%s'", strings.ReplaceAll(svc.Image, "'", "'\\''"))
 	pullSSHArgs := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", node.IP), pullCmd)
 	_ = exec.Command("ssh", pullSSHArgs...).Run()
+
+	dnsDiscoverCmd := "sudo docker inspect -f '{{with index .NetworkSettings.Networks \"gbnt-net\"}}{{.IPAddress}}{{end}}' gbnt-coredns 2>/dev/null || true"
+	dnsSSHArgs := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", node.IP), dnsDiscoverCmd)
+	var dnsOut bytes.Buffer
+	dnsCmd := exec.Command("ssh", dnsSSHArgs...)
+	dnsCmd.Stdout = &dnsOut
+	_ = dnsCmd.Run()
+	workerCoreDNSIP := strings.TrimSpace(dnsOut.String())
 
 	db.DB.Model(&db.Task{}).Where("id = ?", task.ID).Updates(map[string]interface{}{
 		"status": "starting",
 		"error":  fmt.Sprintf("Worker node %s: starting container...", node.ID),
 	})
 
-	// 2. Build docker run arguments with safe single quoting
+	// 2. Build docker run arguments with safe single quoting directly on gbnt-net with network aliases
 	var dockerArgs []string
-	dockerArgs = append(dockerArgs, "sudo", "docker", "run", "-d", "--restart", "unless-stopped", "--name", fmt.Sprintf("'%s'", containerName), "-l", fmt.Sprintf("'gbnt.task.id=%s'", task.ID))
+	dockerArgs = append(dockerArgs, "sudo", "docker", "run", "-d", "--restart", "unless-stopped", "--network", "'gbnt-net'", "--name", fmt.Sprintf("'%s'", containerName), "-l", fmt.Sprintf("'gbnt.task.id=%s'", task.ID))
+
+	cleanSvcAlias := aqueducts.SanitizeDNSLabel(svc.Name)
+	var cleanStackAlias string
+	var stack db.Stack
+	if err := db.DB.First(&stack, "id = ?", svc.StackID).Error; err == nil {
+		cleanStackAlias = aqueducts.SanitizeDNSLabel(stack.Name)
+	}
+	if cleanSvcAlias != "" {
+		dockerArgs = append(dockerArgs,
+			"--network-alias", fmt.Sprintf("'%s'", cleanSvcAlias),
+			"--network-alias", fmt.Sprintf("'%s.gbnt'", cleanSvcAlias),
+			"--network-alias", fmt.Sprintf("'%s.gbnt.local'", cleanSvcAlias),
+		)
+		if cleanStackAlias != "" {
+			dockerArgs = append(dockerArgs,
+				"--network-alias", fmt.Sprintf("'%s.%s'", cleanSvcAlias, cleanStackAlias),
+				"--network-alias", fmt.Sprintf("'%s.%s.gbnt'", cleanSvcAlias, cleanStackAlias),
+				"--network-alias", fmt.Sprintf("'%s.%s.gbnt.local'", cleanSvcAlias, cleanStackAlias),
+			)
+		}
+	}
 
 	if svc.CpuLimit != "" {
 		dockerArgs = append(dockerArgs, "--cpus", fmt.Sprintf("'%s'", svc.CpuLimit))
@@ -157,7 +187,8 @@ func executeRemoteWorkerTask(task db.Task, svc db.Service, node db.Node) {
 	if !hasEnv("GBNT_SERVICE_NAME") && svc.Name != "" {
 		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("'GBNT_SERVICE_NAME=%s'", svc.Name))
 	}
-	// DNS Resolver configuration
+	// DNS Resolver configuration: use worker's gbnt-coredns container IP on gbnt-net (where port 53 is open)
+	// + 8.8.8.8 fallback, avoiding closed host port 53 when systemd-resolved is active.
 	if len(svc.DNS) > 0 {
 		for _, d := range svc.DNS {
 			dClean := strings.TrimSpace(d)
@@ -166,13 +197,10 @@ func executeRemoteWorkerTask(task db.Task, svc db.Service, node db.Node) {
 			}
 		}
 	} else {
-		// Lookup Manager DNS IP (use the manager's reachable LAN IP for remote worker nodes)
-		var managerNode db.Node
-		managerDNS := "127.0.0.1"
-		if err := db.DB.Where("role = ?", "manager").First(&managerNode).Error; err == nil && managerNode.IP != "" {
-			managerDNS = managerNode.IP
+		if workerCoreDNSIP != "" {
+			dockerArgs = append(dockerArgs, "--dns", fmt.Sprintf("'%s'", workerCoreDNSIP))
 		}
-		dockerArgs = append(dockerArgs, "--dns", fmt.Sprintf("'%s'", managerDNS))
+		dockerArgs = append(dockerArgs, "--dns", "'8.8.8.8'")
 	}
 
 	if len(svc.DnsSearch) > 0 {
@@ -197,10 +225,34 @@ func executeRemoteWorkerTask(task db.Task, svc db.Service, node db.Node) {
 	}
 
 	var prepCmds []string
+	syncDirs := map[string]bool{}
 	for _, v := range svc.Volumes {
 		parts := strings.Split(v, ":")
 		if len(parts) > 0 && strings.HasPrefix(parts[0], "/") {
+			if strings.HasPrefix(parts[0], "/var/contenedores/fiware-smart-city") {
+				_ = examples.EnsureFIWAREStorageFiles()
+				syncDirs["fiware-smart-city"] = true
+			} else if strings.HasPrefix(parts[0], "/var/contenedores/scada-dnp3") {
+				_ = examples.EnsureSCADAStorageFiles()
+				syncDirs["scada-dnp3"] = true
+			}
 			prepCmds = append(prepCmds, fmt.Sprintf("if [ ! -f '%s' ]; then sudo mkdir -p '%s' && sudo chmod 777 '%s' 2>/dev/null || true; fi", parts[0], parts[0], parts[0]))
+		}
+	}
+
+	// Sync embedded POC scripts/assets to remote worker node if scheduled on a worker without shared GlusterFS
+	for dirName := range syncDirs {
+		localDir := "/var/contenedores/" + dirName
+		if _, err := os.Stat(localDir); err == nil {
+			var tarBuf bytes.Buffer
+			tarCmd := exec.Command("tar", "-C", "/var/contenedores", "-cf", "-", dirName)
+			tarCmd.Stdout = &tarBuf
+			if tarCmd.Run() == nil && tarBuf.Len() > 0 {
+				untarSSHArgs := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", node.IP), "sudo mkdir -p /var/contenedores && sudo tar -C /var/contenedores -xf - && sudo chmod -R 777 /var/contenedores/"+dirName+" 2>/dev/null || true")
+				untarCmd := exec.Command("ssh", untarSSHArgs...)
+				untarCmd.Stdin = &tarBuf
+				_ = untarCmd.Run()
+			}
 		}
 	}
 	prepCmds = append(prepCmds, fmt.Sprintf("sudo docker rm -f '%s' 2>/dev/null || true", containerName))
@@ -225,24 +277,7 @@ func executeRemoteWorkerTask(task db.Task, svc db.Service, node db.Node) {
 		return
 	}
 
-	// 3. Connect container to gbnt-net with service and stack DNS aliases for inter-service communication and Caddy ingress
-	cleanSvcAlias := aqueducts.SanitizeDNSLabel(svc.Name)
-	aliasFlags := ""
-	if cleanSvcAlias != "" {
-		aliasFlags = fmt.Sprintf("--alias '%s'", cleanSvcAlias)
-		var stack db.Stack
-		if err := db.DB.First(&stack, "id = ?", svc.StackID).Error; err == nil {
-			cleanStackAlias := aqueducts.SanitizeDNSLabel(stack.Name)
-			if cleanStackAlias != "" {
-				aliasFlags += fmt.Sprintf(" --alias '%s.%s.gbnt' --alias '%s.%s.gbnt.local'", cleanSvcAlias, cleanStackAlias, cleanSvcAlias, cleanStackAlias)
-			}
-		}
-	}
-	connCmd := fmt.Sprintf("sudo docker network create gbnt-net 2>/dev/null || true; sudo docker network connect %s gbnt-net '%s' 2>/dev/null || true", aliasFlags, containerName)
-	connSSHArgs := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", node.IP), connCmd)
-	_ = exec.Command("ssh", connSSHArgs...).Run()
-
-	// 4. Obtain container IP on remote worker (prefer gbnt-net, fallback to any network or node.IP)
+	// 3. Obtain container IP on remote worker (prefer gbnt-net, fallback to any network or node.IP)
 	ipCmd := fmt.Sprintf("sudo docker inspect -f '{{with index .NetworkSettings.Networks \"gbnt-net\"}}{{.IPAddress}}{{else}}{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}{{end}}' '%s'", containerName)
 	ipSSHArgs := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", node.IP), ipCmd)
 	var ipOut bytes.Buffer
@@ -315,6 +350,20 @@ func executeTask(task db.Task, svc db.Service) {
 		localEnv = append(localEnv, fmt.Sprintf("GBNT_SERVICE_NAME=%s", svc.Name))
 	}
 
+	for _, v := range svc.Volumes {
+		if strings.HasPrefix(v, "/var/contenedores/fiware-smart-city") {
+			_ = examples.EnsureFIWAREStorageFiles()
+		} else if strings.HasPrefix(v, "/var/contenedores/scada-dnp3") {
+			_ = examples.EnsureSCADAStorageFiles()
+		}
+	}
+
+	var stack db.Stack
+	var cleanStackName string
+	if err := db.DB.First(&stack, "id = ?", svc.StackID).Error; err == nil {
+		cleanStackName = aqueducts.SanitizeDNSLabel(stack.Name)
+	}
+
 	cfg := docker.ContainerConfig{
 		TaskID:            task.ID,
 		Image:             svc.Image,
@@ -327,6 +376,8 @@ func executeTask(task db.Task, svc db.Service) {
 		CpuLimit:          svc.CpuLimit,
 		MemoryLimit:       svc.MemoryLimit,
 		MemoryReservation: svc.MemoryReservation,
+		ServiceName:       aqueducts.SanitizeDNSLabel(svc.Name),
+		StackName:         cleanStackName,
 	}
 
 	containerName, ip, err := docker.StartContainer(cfg)

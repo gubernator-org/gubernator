@@ -169,3 +169,18 @@ This page is your index to the progressive tutorials included with Gubernator. E
 - Cyclic Class 0/1/2/3 integrity polling and CROB Direct Operate breaker control
 - Pre-configured FUXA SCADA/HMI project with interactive Single-Line Diagram, gauges, and alarm banners
 - Ingress host `fuxa.gbnt.local:1881` with live bidirectional MQTT telemetry
+
+---
+
+## Example FIWARE — Smart City & Digital Twin Platform (NGSI-v2)
+
+**Target**: Intermediate / Smart Cities, IoT & Digital Twins  
+**Goal**: Deploy the flagship Open Source FIWARE Catalogue stack with Orion Context Broker, IoT Agent Ultralight 2.0, MongoDB 6.0, and an interactive Smart City Digital Twin Control Center
+
+[Start Example FIWARE Smart City →](example-fiware.md)
+
+- Official **FIWARE Orion Context Broker** (`telefonicaiot/fiware-orion:3.10.0`) exposing the OMA NGSI-v2 REST API (`https://orion.fiware.gbnt.local`)
+- **FIWARE IoT Agent for Ultralight 2.0** (`fiware/iotagent-ul:1.22.0`) bridging Southbound IoT sensor frames (`:7896`) to NGSI-v2 context entities (`https://iot-agent.fiware.gbnt.local`)
+- **6 Standardized FIWARE Smart Data Models**: `WeatherObserved`, `AirQualityObserved`, `TrafficFlowObserved`, `Streetlight`, `ThreePhaseAcMeasurement`, and `WaterQualityObserved`
+- Interactive **Smart City Digital Twin Control Center UI** (`https://fiware.gbnt.local`) with live streetlight dimmer actuation, rush-hour traffic simulation, and raw NGSI-v2 JSON inspector
+

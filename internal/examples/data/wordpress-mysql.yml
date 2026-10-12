@@ -5,13 +5,14 @@ services:
     image: mysql:8.0
     container_name: db_wordpress
     restart: always
+    command: --default-authentication-plugin=mysql_native_password --innodb-use-native-aio=0 --innodb-flush-method=fsync
     environment:
       MYSQL_ROOT_PASSWORD: admin
       MYSQL_DATABASE: wordpress
       MYSQL_USER: wp_user
       MYSQL_PASSWORD: admin
     volumes:
-      - /var/contenedores/{{stack.name}}/db:/var/lib/mysql
+      - /var/contenedores/{{stack.name}}/mysql-data:/var/lib/mysql
     deploy:
       resources:
         limits:
@@ -33,7 +34,7 @@ services:
       WORDPRESS_DB_USER: wp_user
       WORDPRESS_DB_PASSWORD: admin
     volumes:
-      - /var/contenedores/{{stack.name}}/html:/var/www/html
+      - /var/contenedores/{{stack.name}}/wp-html:/var/www/html
     labels:
       - "ingress.host=wordpress.gbnt.local"
       - "gbnt.caddy.port=80"

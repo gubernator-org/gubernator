@@ -3,6 +3,7 @@ services:
     image: mysql:8.0
     container_name: db_wordpress
     restart: always
+    command: --default-authentication-plugin=mysql_native_password --innodb-use-native-aio=0 --innodb-flush-method=fsync
     environment:
       MYSQL_ROOT_PASSWORD: admin
       MYSQL_DATABASE: wordpress
@@ -31,7 +32,7 @@ services:
       WORDPRESS_DB_USER: wp_user
       WORDPRESS_DB_PASSWORD: admin
     labels:
-      - "ingress.host=hello-101.gbnt.local"
+      - "ingress.host=wordpress.gbnt.local"
       - "gbnt.caddy.port=80"
     deploy:
       replicas: 1

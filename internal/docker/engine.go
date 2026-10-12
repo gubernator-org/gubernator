@@ -36,6 +36,8 @@ type ContainerConfig struct {
 	CpuLimit          string   // e.g. "1.5"
 	MemoryLimit       string   // e.g. "512M", "2G"
 	MemoryReservation string   // e.g. "128M"
+	ServiceName       string   // sanitized service name for gbnt-net DNS aliases (e.g. "db")
+	StackName         string   // sanitized stack name for gbnt-net DNS aliases (e.g. "wordpress-demo")
 }
 
 // PullImage pulls a Docker image from a registry.
@@ -61,9 +63,13 @@ func SetDefaultDNS(dns string) {
 
 // StartContainer creates and starts a container with full compose-like config.
 // Returns the container name and its internal IP address.
-// All managed containers are automatically connected to gbnt-net for DNS resolution.
+// All managed containers are created directly on gbnt-net so Docker's embedded DNS (127.0.0.11)
+// and CoreDNS resolve service and stack aliases reliably.
 func StartContainer(cfg ContainerConfig) (containerName, ip string, err error) {
 	containerName = "gbnt-" + cfg.TaskID
+
+	// Ensure gbnt-net exists before starting container directly on it
+	_ = coredns.EnsureNetwork()
 
 	// Remove any existing container with the same name before starting to prevent conflict errors
 	_ = exec.Command("docker", "rm", "-f", containerName).Run()
@@ -73,7 +79,29 @@ func StartContainer(cfg ContainerConfig) (containerName, ip string, err error) {
 		restartPolicy = "unless-stopped"
 	}
 
-	args := []string{"run", "-d", "--name", containerName, "--restart", restartPolicy, "-l", "gbnt.task.id=" + cfg.TaskID}
+	args := []string{
+		"run", "-d",
+		"--name", containerName,
+		"--restart", restartPolicy,
+		"--network", coredns.NetworkName,
+		"-l", "gbnt.task.id=" + cfg.TaskID,
+	}
+
+	// Register Docker embedded DNS aliases on gbnt-net for instant inter-container resolution
+	if cfg.ServiceName != "" {
+		args = append(args,
+			"--network-alias", cfg.ServiceName,
+			"--network-alias", cfg.ServiceName+".gbnt",
+			"--network-alias", cfg.ServiceName+".gbnt.local",
+		)
+		if cfg.StackName != "" {
+			args = append(args,
+				"--network-alias", fmt.Sprintf("%s.%s", cfg.ServiceName, cfg.StackName),
+				"--network-alias", fmt.Sprintf("%s.%s.gbnt", cfg.ServiceName, cfg.StackName),
+				"--network-alias", fmt.Sprintf("%s.%s.gbnt.local", cfg.ServiceName, cfg.StackName),
+			)
+		}
+	}
 
 	// Resource limits & reservations
 	if cfg.CpuLimit != "" {
@@ -109,7 +137,7 @@ func StartContainer(cfg ContainerConfig) (containerName, ip string, err error) {
 	}
 
 	// DNS Resolver configuration: use explicit DNS from Compose if provided,
-	// otherwise fallback to CoreDNS resolver IP.
+	// otherwise use CoreDNS container IP on gbnt-net (where port 53 is always open) + 8.8.8.8 fallback.
 	if len(cfg.DNS) > 0 {
 		for _, d := range cfg.DNS {
 			if strings.TrimSpace(d) != "" {
@@ -126,26 +154,17 @@ func StartContainer(cfg ContainerConfig) (containerName, ip string, err error) {
 			args = append(args, "--dns-search", "gbnt.local")
 		}
 	} else {
-		dnsIP := DefaultDNS
+		dnsIP := coredns.GetContainerIP()
 		if dnsIP == "" {
-			dnsIP = coredns.GetContainerIP()
+			dnsIP = DefaultDNS
 		}
 		if dnsIP == "" {
 			dnsIP = os.Getenv("GBNT_DNS_SERVER")
 		}
-		if dnsIP == "" {
-			var managerNode db.Node
-			if err := db.DB.Where("role = ?", "manager").First(&managerNode).Error; err == nil && managerNode.IP != "" {
-				dnsIP = managerNode.IP
-			}
-		}
-		if dnsIP == "" {
-			dnsIP = os.Getenv("GBNT_MANAGER_IP")
-		}
 		if dnsIP != "" {
 			args = append(args, "--dns", dnsIP)
-			args = append(args, "--dns-search", "gbnt.local")
 		}
+		args = append(args, "--dns", "8.8.8.8", "--dns-search", "gbnt.local")
 	}
 
 	args = append(args, cfg.Image)
@@ -161,13 +180,6 @@ func StartContainer(cfg ContainerConfig) (containerName, ip string, err error) {
 
 	if err = cmd.Run(); err != nil {
 		return "", "", fmt.Errorf("failed to run container: %w", err)
-	}
-
-	// Connect the container to gbnt-net so it can resolve *.gbnt via CoreDNS.
-	// This must be done before querying the IP on gbnt-net.
-	if connErr := coredns.ConnectContainer(containerName); connErr != nil {
-		// Non-fatal: container is running, DNS is just not available on gbnt-net
-		fmt.Printf("⚠️  docker: failed to connect %s to gbnt-net: %v\n", containerName, connErr)
 	}
 
 	// Fetch container IP in gbnt-net (with fallback to default bridge network)

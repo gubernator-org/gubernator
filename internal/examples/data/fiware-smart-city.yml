@@ -1,0 +1,133 @@
+version: "3.8"
+
+# =============================================================================
+# Gubernator (gbnt) - FIWARE Smart City & Digital Twin Platform (NGSI-v2)
+# Official FIWARE Catalogue Generic Enablers:
+#   1. FIWARE Orion Context Broker (telefonicaiot/fiware-orion) - Port 1026
+#   2. FIWARE IoT Agent for Ultralight 2.0 (fiware/iotagent-ul) - Ports 4041 / 7896
+#   3. MongoDB 6.0 Context Database (mongo:6.0) - Port 27017
+#   4. FIWARE Smart City Digital Twin Dashboard & IoT Simulator - Port 8080
+# =============================================================================
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. MongoDB 6.0 — Context & Device Registry Backing Store
+  # ─────────────────────────────────────────────────────────────────────────────
+  mongo-db:
+    image: mongo:6.0
+    restart: unless-stopped
+    command: --nojournal
+    volumes:
+      - /var/contenedores/{{stack.name}}/mongo-data:/data/db
+    labels:
+      - "gbnt.service.name=fiware-mongo-db"
+      - "gbnt.service.description=MongoDB 6.0 Context Store for FIWARE Orion and IoT Agent"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. FIWARE Orion Context Broker — Core Context Management (NGSI-v2 API)
+  # ─────────────────────────────────────────────────────────────────────────────
+  orion:
+    image: telefonicaiot/fiware-orion:3.10.0
+    restart: unless-stopped
+    command: -dbhost mongo-db -logLevel WARN
+    ports:
+      - "1026:1026"
+    depends_on:
+      - mongo-db
+    labels:
+      - "ingress.host=orion.fiware.gbnt.local"
+      - "gbnt.caddy.port=1026"
+      - "gbnt.service.name=fiware-orion"
+      - "gbnt.service.description=FIWARE Orion Context Broker (NGSI-v2 API)"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. FIWARE IoT Agent for Ultralight 2.0 — Southbound IoT Device Gateway
+  # ─────────────────────────────────────────────────────────────────────────────
+  iot-agent:
+    image: fiware/iotagent-ul:1.22.0
+    restart: unless-stopped
+    environment:
+      - IOTA_CB_HOST=orion
+      - IOTA_CB_PORT=1026
+      - IOTA_NORTH_PORT=4041
+      - IOTA_REGISTRY_TYPE=mongodb
+      - IOTA_MONGO_HOST=mongo-db
+      - IOTA_MONGO_PORT=27017
+      - IOTA_MONGO_DB=iotagentul
+      - IOTA_HTTP_PORT=7896
+      - IOTA_PROVIDER_URL=http://iot-agent:4041
+      - IOTA_DEFAULT_RESOURCE=/iot/d
+      - IOTA_CB_NGSI_VERSION=v2
+      - IOTA_AUTOCAST=true
+      - IOTA_TIMESTAMP=true
+      - IOTA_LOG_LEVEL=WARN
+    ports:
+      - "4041:4041"
+      - "7896:7896"
+    depends_on:
+      - mongo-db
+      - orion
+    labels:
+      - "ingress.host=iot-agent.fiware.gbnt.local"
+      - "gbnt.caddy.port=4041"
+      - "gbnt.service.name=fiware-iot-agent"
+      - "gbnt.service.description=FIWARE IoT Agent for Ultralight 2.0 (Northbound 4041 / Southbound 7896)"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. FIWARE Smart City Digital Twin Control Center & Telemetry Simulator
+  # ─────────────────────────────────────────────────────────────────────────────
+  fiware-smart-city:
+    image: python:3.11-slim
+    restart: unless-stopped
+    command: python3 /app/fiware_smart_city.py
+    environment:
+      - ORION_URL=http://orion:1026
+      - IOTA_NORTH_URL=http://iot-agent:4041
+      - IOTA_SOUTH_URL=http://iot-agent:7896
+      - FIWARE_SERVICE=smartcity
+      - FIWARE_SERVICEPATH=/
+      - PORT=8080
+    ports:
+      - "8088:8080"
+    volumes:
+      - /var/contenedores/fiware-smart-city:/app:ro
+    depends_on:
+      - orion
+      - iot-agent
+    labels:
+      - "ingress.host=fiware.gbnt.local"
+      - "gbnt.caddy.port=8080"
+      - "gbnt.service.name=fiware-smart-city-ui"
+      - "gbnt.service.description=FIWARE Smart City Interactive NGSI-v2 Dashboard & IoT Simulator"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M

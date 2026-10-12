@@ -218,6 +218,17 @@ var catalog = []POCExample{
 		Icon:         "sensors",
 		Tags:         []string{"scada", "dnp3", "ieee-1815", "fuxa", "iot", "substation", "solar", "mqtt", "hmi", "industrial"},
 	},
+	{
+		ID:           "fiware-smart-city",
+		Name:         "FIWARE Smart City & Digital Twin (Orion Context Broker + IoT Agent NGSI-v2)",
+		Category:     "IoT & Industrial SCADA",
+		Description:  "Flagship Open Source FIWARE Catalogue deployment: Orion Context Broker (NGSI-v2 API), IoT Agent Ultralight 2.0, MongoDB 6.0, and interactive Smart City Digital Twin Control Center simulating Smart Data Models (Weather, Air Quality, Traffic, Streetlights, Smart Energy).",
+		Filename:     "fiware-smart-city.yml",
+		DefaultStack: "fiware-smart-city",
+		Services:     []string{"mongo-db", "orion", "iot-agent", "fiware-smart-city"},
+		Icon:         "location_city",
+		Tags:         []string{"fiware", "orion", "ngsi-v2", "iot-agent", "smart-city", "digital-twin", "iot", "ultralight", "mongodb"},
+	},
 }
 
 // GetAllPOCExamples returns all built-in POC examples with their compose definitions populated.
@@ -272,19 +283,20 @@ func EnsureServerDirectories() error {
 	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
 		readmeContent := `# Gubernator Master Server Stacks Directory
 
-Place your Docker Compose files (\x60.yml\x60 or \x60.yaml\x60) in this directory on the Gubernator Master server:
+Place your Docker Compose files (` + "`.yml`" + ` or ` + "`.yaml`" + `) in this directory on the Gubernator Master server:
 
   Path: ` + stacksDir + `
 
 Gubernator automatically discovers files in this directory. You can deploy them:
 1. Via Web UI: In "New Stack" or "Compose Studio", click "Load from Master Server" to browse and deploy.
-2. Via CLI: Run \x60gbnt stack deploy --from-server ` + stacksDir + `/my-stack.yml\x60
-3. Via REST API: POST /api/stacks/server-deploy with \x60{"path": "` + stacksDir + `/my-stack.yml"}\x60
+2. Via CLI: Run ` + "`gbnt stack deploy --from-server " + stacksDir + "/my-stack.yml`" + `
+3. Via REST API: POST /api/stacks/server-deploy with ` + "`{\"path\": \"" + stacksDir + "/my-stack.yml\"}`" + `
 `
 		_ = os.WriteFile(readmePath, []byte(readmeContent), 0644)
 	}
 
 	_ = EnsureSCADAStorageFiles()
+	_ = EnsureFIWAREStorageFiles()
 	return ExportExamplesToDisk(DefaultServerExamplesDir())
 }
 
@@ -318,6 +330,30 @@ func EnsureSCADAStorageFiles() error {
 	return nil
 }
 
+// EnsureFIWAREStorageFiles exports embedded FIWARE Smart City simulator & dashboard script to /var/contenedores/fiware-smart-city
+func EnsureFIWAREStorageFiles() error {
+	destDirs := []string{
+		"/var/contenedores/fiware-smart-city",
+		filepath.Join(DefaultServerExamplesDir(), "fiware-smart-city"),
+	}
+
+	files := []string{
+		"fiware_smart_city.py",
+	}
+
+	for _, baseDir := range destDirs {
+		_ = os.MkdirAll(baseDir, 0777)
+		for _, f := range files {
+			data, err := embeddedExamples.ReadFile("data/fiware-smart-city/" + f)
+			if err == nil {
+				target := filepath.Join(baseDir, f)
+				_ = os.WriteFile(target, data, 0755)
+			}
+		}
+	}
+	return nil
+}
+
 // ExportExamplesToDisk writes all embedded POC examples to the designated directory on the Master host.
 func ExportExamplesToDisk(destDir string) error {
 	if err := os.MkdirAll(destDir, 0755); err != nil {
@@ -339,7 +375,7 @@ func ExportExamplesToDisk(destDir string) error {
 	for _, ex := range GetAllPOCExamples() {
 		indexMd += fmt.Sprintf("| `%s` | %s | %s | `%s` | %s |\n", ex.ID, ex.Name, ex.Category, ex.Filename, ex.Description)
 	}
-	indexMd += "\n## Quick Deployment via CLI:\n```bash\n# Deploy a specific POC example:\ngbnt examples deploy wordpress-mysql\n\n# Deploy all POC examples:\ngbnt examples deploy all\n```\n"
+	indexMd += "\n## Quick Deployment via CLI:\n```bash\n# Deploy a specific POC example:\ngbnt examples deploy wordpress-mysql\ngbnt examples deploy fiware-smart-city\n\n# Deploy all POC examples:\ngbnt examples deploy all\n```\n"
 
 	_ = os.WriteFile(filepath.Join(destDir, "README.md"), []byte(indexMd), 0644)
 	return nil
@@ -363,6 +399,9 @@ func DeployPOCExample(id string, targetNode string) (*db.Stack, error) {
 
 	if id == "scada-dnp3-fuxa" {
 		_ = EnsureSCADAStorageFiles()
+	}
+	if id == "fiware-smart-city" {
+		_ = EnsureFIWAREStorageFiles()
 	}
 
 	return DeployStackFn(stackName, ex.ComposeRaw, targetNode)
