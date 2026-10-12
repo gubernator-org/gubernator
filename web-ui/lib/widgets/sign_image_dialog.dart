@@ -159,7 +159,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.15),
+                color: const Color(0xFF10B981).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.verified_user, color: Color(0xFF10B981), size: 26),
@@ -200,9 +200,9 @@ class _SignImageDialogState extends State<SignImageDialog> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.12),
+                      color: Colors.redAccent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       children: [
@@ -228,7 +228,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
 
                 if (widget.availableImages.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
-                    value: _selectedImageOption,
+                    initialValue: _selectedImageOption,
                     isExpanded: true,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.layers, size: 20),
@@ -293,7 +293,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
 
                 if (widget.availableKeys.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
-                    value: _useCustomKey ? 'custom' : _selectedKeyId,
+                    initialValue: _useCustomKey ? 'custom' : _selectedKeyId,
                     isExpanded: true,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
@@ -324,7 +324,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.withOpacity(0.2),
+                                    color: Colors.amber.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text('DEFAULT', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
@@ -334,7 +334,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: k.hasPrivateKey ? const Color(0xFF10B981).withOpacity(0.15) : Colors.grey.withOpacity(0.15),
+                                  color: k.hasPrivateKey ? const Color(0xFF10B981).withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -386,9 +386,9 @@ class _SignImageDialogState extends State<SignImageDialog> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.08),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,7 +499,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.15),
+                color: const Color(0xFF10B981).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 26),
@@ -547,7 +547,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                   ),
                   child: SelectableText(
                     signature,
@@ -594,7 +594,7 @@ class _SignImageDialogState extends State<SignImageDialog> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

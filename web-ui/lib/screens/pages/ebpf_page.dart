@@ -605,7 +605,7 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                 )
               : ListView.separated(
                   itemCount: _flows.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.2)),
+                  separatorBuilder: (_, _) => Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.2)),
                   itemBuilder: (ctx, idx) {
                     final flow = _flows[idx];
                     return _buildFlowRow(flow, theme);
@@ -965,7 +965,7 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: edges.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.2)),
+                separatorBuilder: (_, _) => Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.2)),
               itemBuilder: (ctx, idx) {
                 final e = edges[idx];
                 final protoColor = _getProtocolColor(e.protocol);
@@ -1730,7 +1730,7 @@ class _SimulationDialogState extends State<_SimulationDialog> {
 
             // Pattern Selector
             DropdownButtonFormField<String>(
-              value: _pattern,
+              initialValue: _pattern,
               decoration: const InputDecoration(labelText: 'Traffic Pattern', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'normal', child: Text('Normal Web Traffic (200 OK)')),

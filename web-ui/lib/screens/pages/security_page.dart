@@ -585,7 +585,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                                 : (enabled ? "Temporarily suspend access" : "Activate account"),
                             child: Switch(
                               value: enabled,
-                              activeColor: Colors.green,
+                              activeThumbColor: Colors.green,
                               inactiveThumbColor: Colors.amber.shade800,
                               inactiveTrackColor: Colors.amber.withValues(alpha: 0.35),
                               onChanged: (user?.username.toLowerCase() == "admin")
@@ -651,7 +651,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                   }
 
                   if (mounted) {
-                    Navigator.pop(ctx);
+                    if (ctx.mounted) Navigator.pop(ctx);
                     _showSnackBar(isEdit ? "User '$username' updated successfully" : "User '$username' created successfully");
                     _loadLocalUsers();
                   }
@@ -723,11 +723,11 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
               }
               final res = await ApiService.resetLocalUserPassword(user.id, newPass);
               if (res["error"] != null) {
-                _showSnackBar("Failed: " + res["error"].toString(), isError: true);
+                _showSnackBar("Failed: ${res["error"]}", isError: true);
                 return;
               }
               if (mounted) {
-                Navigator.pop(ctx);
+                if (ctx.mounted) Navigator.pop(ctx);
                 _showSnackBar("Password updated successfully for '${user.username}'");
               }
             },
@@ -1115,7 +1115,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                       return;
                     }
                     if (mounted) {
-                      Navigator.pop(ctx);
+                      if (ctx.mounted) Navigator.pop(ctx);
                       _showSnackBar("MFA enabled successfully for '${user.username}' (ENS op.acc.2)");
                       _loadLocalUsers();
                     }
@@ -1534,12 +1534,12 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
 
                   final res = await ApiService.saveLDAPConfig(cfg);
                   if (res["error"] != null) {
-                    _showSnackBar("Failed to save directory config: " + res["error"].toString(), isError: true);
+                    _showSnackBar("Failed to save directory config: ${res["error"]}", isError: true);
                     return;
                   }
 
                   if (mounted) {
-                    Navigator.pop(ctx);
+                    if (ctx.mounted) Navigator.pop(ctx);
                     _showSnackBar("Directory server configuration saved");
                     _loadLDAPConfigs();
                   }
@@ -1713,7 +1713,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
-              child: Text("Error loading local users: " + _usersError!, style: const TextStyle(color: Colors.red)),
+              child: Text("Error loading local users: ${_usersError!}", style: const TextStyle(color: Colors.red)),
             )
           else if (_localUsers.isEmpty)
             Container(
@@ -1811,7 +1811,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                                       scale: 0.8,
                                       child: Switch(
                                         value: usr.enabled,
-                                        activeColor: Colors.green,
+                                        activeThumbColor: Colors.green,
                                         inactiveThumbColor: Colors.amber.shade800,
                                         inactiveTrackColor: Colors.amber.withValues(alpha: 0.3),
                                         onChanged: usr.username.toLowerCase() == "admin"
@@ -1952,7 +1952,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
-              child: Text("Error loading directory servers: " + _ldapError!, style: const TextStyle(color: Colors.red)),
+              child: Text("Error loading directory servers: ${_ldapError!}", style: const TextStyle(color: Colors.red)),
             )
           else if (_ldapConfigs.isEmpty)
             Container(
@@ -2708,7 +2708,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                     return;
                   }
                   if (mounted) {
-                    Navigator.pop(ctx);
+                    if (ctx.mounted) Navigator.pop(ctx);
                     _showSnackBar(isEdit
                         ? "SSO provider '${cfg.name}' updated successfully"
                         : "SSO provider '${cfg.name}' added — it will appear on the login screen");
@@ -2885,7 +2885,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
-              child: Text("Error loading audit trail: " + _auditError!, style: const TextStyle(color: Colors.red)),
+              child: Text("Error loading audit trail: ${_auditError!}", style: const TextStyle(color: Colors.red)),
             )
           else if (_auditLogs.isEmpty)
             Container(
@@ -2973,7 +2973,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 const SizedBox(height: 4),
                 Text(
                   isValid
-                      ? "Chain of ${v.verifiedRecords} events sequentially linked (Hash -> PrevHash). No records have been altered or deleted. Latest Hash: ${v.lastHash.isEmpty ? 'GENESIS' : (v.lastHash.length > 20 ? v.lastHash.substring(0, 20) + '...' : v.lastHash)}"
+                      ? "Chain of ${v.verifiedRecords} events sequentially linked (Hash -> PrevHash). No records have been altered or deleted. Latest Hash: ${v.lastHash.isEmpty ? 'GENESIS' : (v.lastHash.length > 20 ? '${v.lastHash.substring(0, 20)}...' : v.lastHash)}"
                       : "Forensic verification error: ${v.error}",
                   style: TextStyle(
                     fontSize: 12,
@@ -3063,7 +3063,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: [3, 5, 10].contains(cfg.maxFailedLogins) ? cfg.maxFailedLogins : 5,
+                  initialValue: [3, 5, 10].contains(cfg.maxFailedLogins) ? cfg.maxFailedLogins : 5,
                   decoration: const InputDecoration(
                     labelText: "Failed Attempts Lockout (ENS op.acc.2)",
                     isDense: true,
@@ -3086,7 +3086,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: [5, 15, 30, 60].contains(cfg.lockoutDurationMinutes) ? cfg.lockoutDurationMinutes : 15,
+                  initialValue: [5, 15, 30, 60].contains(cfg.lockoutDurationMinutes) ? cfg.lockoutDurationMinutes : 15,
                   decoration: const InputDecoration(
                     labelText: "Lockout Duration (Minutes)",
                     isDense: true,
@@ -3110,7 +3110,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: [8, 12, 14, 16].contains(cfg.passwordMinLength) ? cfg.passwordMinLength : 12,
+                  initialValue: [8, 12, 14, 16].contains(cfg.passwordMinLength) ? cfg.passwordMinLength : 12,
                   decoration: const InputDecoration(
                     labelText: "Minimum Password Length",
                     isDense: true,
@@ -3134,7 +3134,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: [5, 15, 30, 60].contains(cfg.sessionTimeoutMinutes) ? cfg.sessionTimeoutMinutes : 15,
+                  initialValue: [5, 15, 30, 60].contains(cfg.sessionTimeoutMinutes) ? cfg.sessionTimeoutMinutes : 15,
                   decoration: const InputDecoration(
                     labelText: "Session Inactivity Timeout (ENS op.acc.2)",
                     isDense: true,
@@ -3221,7 +3221,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 Expanded(
                   flex: 1,
                   child: DropdownButtonFormField<String>(
-                    value: cfg.siemProtocol,
+                    initialValue: cfg.siemProtocol,
                     decoration: const InputDecoration(labelText: "Protocol", isDense: true),
                     items: const [
                       DropdownMenuItem(value: "UDP", child: Text("UDP")),
@@ -3241,7 +3241,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
-                    value: cfg.siemFormat,
+                    initialValue: cfg.siemFormat,
                     decoration: const InputDecoration(labelText: "Format", isDense: true),
                     items: const [
                       DropdownMenuItem(value: "RFC5424", child: Text("RFC5424 (Syslog)")),

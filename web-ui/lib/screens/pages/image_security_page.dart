@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -43,8 +42,6 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
   String _scanSearch = '';
   String _severityFilter = 'ALL';
   String? _selectedSbomImage;
-  Map<String, dynamic>? _sbomData;
-  bool _loadingSbom = false;
 
   @override
   void initState() {
@@ -94,19 +91,15 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
   Future<void> _loadSbom(String image) async {
     setState(() {
       _selectedSbomImage = image;
-      _loadingSbom = true;
     });
     try {
-      final uri = Uri.parse('/api/security/sbom?image=${Uri.encodeComponent(image)}&format=cyclonedx-json');
-      final res = await ApiService.fetchScanDetails(image); // fallback check
-      // Fetch raw SBOM via direct endpoint
-      setState(() {
-        _selectedSbomImage = image;
-        _loadingSbom = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loadingSbom = false);
-    }
+      await ApiService.fetchScanDetails(image); // fallback check
+      if (mounted) {
+        setState(() {
+          _selectedSbomImage = image;
+        });
+      }
+    } catch (_) {}
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -288,7 +281,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                 ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: selectedNode,
+                  initialValue: selectedNode,
                   decoration: InputDecoration(
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -497,7 +490,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                         ? const Center(child: Text('No vulnerabilities found in this scan!'))
                         : ListView.separated(
                             itemCount: vulns.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            separatorBuilder: (_, _) => const Divider(height: 1),
                             itemBuilder: (c, i) {
                               final v = vulns[i];
                               Color sevColor = Colors.blue;
@@ -692,7 +685,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                   onPressed: () async {
                     Navigator.pop(ctx);
                     try {
-                      final res = await ApiService.generateTrustedKey(nameCtrl.text.trim(), isDefault: isDefault);
+                      await ApiService.generateTrustedKey(nameCtrl.text.trim(), isDefault: isDefault);
                       _showSnackBar('✅ Keypair generated and registered');
                       _loadAllData();
                     } catch (e) {
@@ -925,7 +918,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                   const Tab(
                     height: 42,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -955,7 +948,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                   const Tab(
                     height: 42,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1218,7 +1211,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                 )
               : ListView.separated(
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (ctx, i) {
                     final s = filtered[i];
                     final isVerified = s.signatureStatus == 'verified';
@@ -1389,7 +1382,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Digest: ${s.imageDigest.isNotEmpty ? (s.imageDigest.length > 20 ? s.imageDigest.substring(0, 20) + "..." : s.imageDigest) : "local"} | Signer: ${s.signatureSigner ?? "Unsigned"} | Scanned: ${s.scannedAt}',
+                                    'Digest: ${s.imageDigest.isNotEmpty ? (s.imageDigest.length > 20 ? "${s.imageDigest.substring(0, 20)}..." : s.imageDigest) : "local"} | Signer: ${s.signatureSigner ?? "Unsigned"} | Scanned: ${s.scannedAt}',
                                     style: TextStyle(fontSize: 11, color: Colors.grey[400]),
                                   ),
                                 ],
@@ -1714,7 +1707,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _keys.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) {
                 final k = _keys[i];
                 return Card(
@@ -1866,7 +1859,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: signedScans.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) {
                 final s = signedScans[i];
                 return Card(
@@ -1928,7 +1921,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                               Row(
                                 children: [
                                   Text(
-                                    'Digest: ${s.imageDigest.isNotEmpty ? (s.imageDigest.length > 24 ? s.imageDigest.substring(0, 24) + "..." : s.imageDigest) : "local-digest"}',
+                                    'Digest: ${s.imageDigest.isNotEmpty ? (s.imageDigest.length > 24 ? "${s.imageDigest.substring(0, 24)}..." : s.imageDigest) : "local-digest"}',
                                     style: TextStyle(fontSize: 11, color: Colors.grey[400]),
                                   ),
                                   if (s.hosts.isNotEmpty) ...[
@@ -2030,7 +2023,7 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: unsignedScans.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) {
                 final s = unsignedScans[i];
                 return Card(

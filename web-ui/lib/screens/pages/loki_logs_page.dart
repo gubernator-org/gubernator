@@ -25,12 +25,10 @@ class _LokiLogsPageState extends State<LokiLogsPage> {
   List<LokiLogEntry> _logs = [];
   bool _loading = true;
   String _driver = "loki";
-  bool _lokiActive = false;
 
   // Available Filter Options
   List<String> _availableContainers = [];
   List<String> _availableNodes = [];
-  List<String> _availableStreams = ["stdout", "stderr"];
 
   // Selected Filter State
   final TextEditingController _searchCtrl = TextEditingController();
@@ -71,11 +69,9 @@ class _LokiLogsPageState extends State<LokiLogsPage> {
     final labels = await ApiService.fetchLokiLogLabels();
     if (mounted) {
       setState(() {
-        _lokiActive = status["active"] == true;
         _driver = status["driver"] ?? "loki";
         _availableContainers = labels.containers;
         _availableNodes = labels.nodes;
-        _availableStreams = labels.streams.isNotEmpty ? labels.streams : ["stdout", "stderr"];
       });
     }
   }
@@ -846,7 +842,6 @@ class _LokiLogsPageState extends State<LokiLogsPage> {
 
   Widget _buildLevelBadge(String level, String stream) {
     Color bg = Colors.blue;
-    Color fg = Colors.white;
     String text = level;
 
     switch (level.toUpperCase()) {

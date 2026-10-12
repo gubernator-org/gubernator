@@ -610,7 +610,7 @@ class _LegionsPageState extends State<LegionsPage> {
               const Text('Target Node:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: selectedNodeId,
+                initialValue: selectedNodeId,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),

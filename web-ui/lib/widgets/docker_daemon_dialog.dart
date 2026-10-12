@@ -369,7 +369,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2496ED).withOpacity(0.15),
+                      color: const Color(0xFF2496ED).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.tune, color: Color(0xFF2496ED), size: 24),
@@ -389,9 +389,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.12),
+                                color: Colors.blue.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                               ),
                               child: const Text(
                                 'MULTI-HOST ENGINE',
@@ -403,7 +403,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                         const SizedBox(height: 3),
                         Text(
                           'Configure log rotation, zero-downtime (live-restore), NVIDIA GPU, DNS, and metrics across all or targeted cluster nodes.',
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.65)),
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65)),
                         ),
                       ],
                     ),
@@ -444,7 +444,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedNodeId,
+                        initialValue: _selectedNodeId,
                         decoration: const InputDecoration(
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -498,9 +498,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                 margin: const EdgeInsets.fromLTRB(24, 12, 24, 0),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.12),
+                  color: Colors.red.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.4)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
@@ -516,9 +516,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                 margin: const EdgeInsets.fromLTRB(24, 12, 24, 0),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.12),
+                  color: Colors.green.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.withOpacity(0.4)),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
@@ -641,7 +641,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
         children: [
           // Live Restore Card
           Card(
-            color: _liveRestore ? Colors.green.withOpacity(0.08) : null,
+            color: _liveRestore ? Colors.green.withValues(alpha: 0.08) : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: SwitchListTile(
@@ -683,7 +683,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _logDriver,
+                  initialValue: _logDriver,
                   decoration: const InputDecoration(
                     labelText: 'Log Driver (log-driver)',
                     border: OutlineInputBorder(),
@@ -705,7 +705,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _logMaxSize,
+                  initialValue: _logMaxSize,
                   decoration: const InputDecoration(
                     labelText: 'Max Size per File (max-size)',
                     border: OutlineInputBorder(),
@@ -728,7 +728,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _logMaxFile,
+                  initialValue: _logMaxFile,
                   decoration: const InputDecoration(
                     labelText: 'Files to Keep (max-file)',
                     border: OutlineInputBorder(),
@@ -920,7 +920,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Card(
-            color: _enableNvidia ? Colors.green.withOpacity(0.08) : null,
+            color: _enableNvidia ? Colors.green.withValues(alpha: 0.08) : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: SwitchListTile(
@@ -960,7 +960,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _defaultRuntime,
+                    initialValue: _defaultRuntime,
                     decoration: const InputDecoration(
                       labelText: 'Default Runtime (default-runtime)',
                       border: OutlineInputBorder(),
@@ -995,9 +995,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.08),
+                color: Colors.blue.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
               ),
               child: const Row(
                 children: [
@@ -1028,7 +1028,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
         children: [
           // Metrics Prometheus
           Card(
-            color: _enableMetrics ? Colors.purple.withOpacity(0.08) : null,
+            color: _enableMetrics ? Colors.purple.withValues(alpha: 0.08) : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -1096,7 +1096,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
               Expanded(
                 flex: 1,
                 child: DropdownButtonFormField<String>(
-                  value: _storageDriver,
+                  initialValue: _storageDriver,
                   decoration: const InputDecoration(
                     labelText: 'Storage Driver (storage-driver)',
                     border: OutlineInputBorder(),
@@ -1195,9 +1195,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.red.withOpacity(0.4)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
               ),
               child: Text(_jsonSyntaxError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
             ),
@@ -1271,7 +1271,7 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.2),
+                        color: Colors.grey.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(role.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
@@ -1281,9 +1281,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.12),
+                          color: Colors.green.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.green.withOpacity(0.4)),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           children: [
@@ -1298,9 +1298,9 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: (daemonRunning ? Colors.green : Colors.red).withOpacity(0.12),
+                        color: (daemonRunning ? Colors.green : Colors.red).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: (daemonRunning ? Colors.green : Colors.red).withOpacity(0.4)),
+                        border: Border.all(color: (daemonRunning ? Colors.green : Colors.red).withValues(alpha: 0.4)),
                       ),
                       child: Text(
                         daemonRunning ? 'DOCKER ACTIVE' : 'DOCKER INACTIVE',
@@ -1315,11 +1315,11 @@ class _DockerDaemonDialogState extends State<DockerDaemonDialog> with SingleTick
                 ] else ...[
                   Row(
                     children: [
-                      Text('/etc/docker/daemon.json file: ', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
+                      Text('/etc/docker/daemon.json file: ', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12)),
                       Text(configExists ? 'Present' : 'Not configured (defaults)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: configExists ? Colors.blue : Colors.grey)),
                       if (lastMod.isNotEmpty) ...[
                         const SizedBox(width: 16),
-                        Text('Modified: $lastMod', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5), fontSize: 11)),
+                        Text('Modified: $lastMod', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 11)),
                       ],
                       const Spacer(),
                       if (raw.isNotEmpty)

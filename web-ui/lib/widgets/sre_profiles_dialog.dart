@@ -291,7 +291,7 @@ class _SreProfilesDialogState extends State<SreProfilesDialog> {
                       : ListView.separated(
                           padding: const EdgeInsets.all(24),
                           itemCount: _profiles.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 18),
+                          separatorBuilder: (_, _) => const SizedBox(height: 18),
                           itemBuilder: (context, index) {
                             final p = _profiles[index] as Map<String, dynamic>;
                             return _buildProfileCard(p, theme, isDark);

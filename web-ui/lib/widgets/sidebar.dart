@@ -114,7 +114,6 @@ class _GubernatorSidebarState extends State<GubernatorSidebar>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeDef = GubernatorTheme.getThemeDef(widget.currentThemeId);
-    final isDark = themeDef.isDark;
     final bgColor = themeDef.sidebarBg;
     final borderColor = themeDef.sidebarBorder;
     final textColor = themeDef.textPrimary;
@@ -222,7 +221,7 @@ class _GubernatorSidebarState extends State<GubernatorSidebar>
                 width: 30,
                 height: 30,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
+                errorBuilder: (_, _, _) => const Icon(
                   Icons.hub,
                   color: Color(0xFFF97316),
                   size: 24,

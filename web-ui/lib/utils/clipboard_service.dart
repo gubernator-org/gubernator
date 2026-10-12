@@ -81,7 +81,7 @@ class ClipboardService {
     try {
       if (html.window.navigator.clipboard != null) {
         final text = await html.window.navigator.clipboard!.readText();
-        if (text != null && text.isNotEmpty) {
+        if (text.isNotEmpty) {
           return text;
         }
       }

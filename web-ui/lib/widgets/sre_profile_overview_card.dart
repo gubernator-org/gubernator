@@ -19,9 +19,7 @@ class SreProfileOverviewCard extends StatefulWidget {
 
 class _SreProfileOverviewCardState extends State<SreProfileOverviewCard> {
   bool _loading = true;
-  String _activeProfileId = 'cloud-native';
   Map<String, dynamic>? _activeProfile;
-  List<dynamic> _allProfiles = [];
 
   @override
   void initState() {
@@ -41,8 +39,6 @@ class _SreProfileOverviewCardState extends State<SreProfileOverviewCard> {
         );
 
         setState(() {
-          _allProfiles = profiles;
-          _activeProfileId = activeId;
           _activeProfile = active != null ? Map<String, dynamic>.from(active as Map) : null;
           _loading = false;
         });

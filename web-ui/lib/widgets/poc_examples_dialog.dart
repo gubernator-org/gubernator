@@ -249,7 +249,7 @@ class _POCExamplesDialogState extends State<POCExamplesDialog> {
                             child: FilterChip(
                               label: Text(cat),
                               selected: isSelected,
-                              selectedColor: const Color(0xFF1F6FEB).withOpacity(0.3),
+                              selectedColor: const Color(0xFF1F6FEB).withValues(alpha: 0.3),
                               checkmarkColor: const Color(0xFF58A6FF),
                               backgroundColor: const Color(0xFF0D1117),
                               side: BorderSide(
@@ -452,9 +452,9 @@ class _POCExamplesDialogState extends State<POCExamplesDialog> {
                     margin: const EdgeInsets.only(right: 4),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1F6FEB).withOpacity(0.12),
+                      color: const Color(0xFF1F6FEB).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF1F6FEB).withOpacity(0.4)),
+                      border: Border.all(color: const Color(0xFF1F6FEB).withValues(alpha: 0.4)),
                     ),
                     child: Text(
                       s,

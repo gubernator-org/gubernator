@@ -1,6 +1,5 @@
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -12,7 +11,6 @@ import 'save_pc_stack_dialog.dart';
 import 'poc_examples_dialog.dart';
 import '../models/models.dart' as models;
 import '../utils/clipboard_service.dart';
-import '../utils/download_service.dart';
 
 /// A dialog to define and deploy a new Docker Compose stack, featuring the Gubernator Copilot.
 class NewStackDialog extends StatefulWidget {
@@ -144,7 +142,7 @@ class _NewStackDialogState extends State<NewStackDialog> {
       _yamlController.text = text.substring(0, pos) + injection + text.substring(pos);
       _yamlController.selection = TextSelection.collapsed(offset: pos + injection.length);
     } else {
-      _yamlController.text = text + '\n' + injection;
+      _yamlController.text = '$text\n$injection';
     }
   }
 
@@ -156,7 +154,7 @@ class _NewStackDialogState extends State<NewStackDialog> {
       _yamlController.text = text.substring(0, pos) + injection + text.substring(pos);
       _yamlController.selection = TextSelection.collapsed(offset: pos + injection.length);
     } else {
-      _yamlController.text = text + '\n' + injection;
+      _yamlController.text = '$text\n$injection';
     }
   }
 
@@ -268,11 +266,11 @@ class _NewStackDialogState extends State<NewStackDialog> {
                         if (pos >= 0 && pos <= text.length) {
                           _yamlController.text = text.substring(0, pos) + injection + text.substring(pos);
                         } else {
-                          _yamlController.text = text + '\n' + injection;
+                          _yamlController.text = '$text\n$injection';
                         }
                       },
                     ),
-                  )).toList(),
+                  )),
                 ],
                 if (_activeTab == 'storage') ...[
                   const Text('Storage Granaries', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -408,7 +406,7 @@ class _NewStackDialogState extends State<NewStackDialog> {
                                 ),
                                 const SizedBox(height: 8),
                                 DropdownButtonFormField<String>(
-                                  value: _selectedNode,
+                                  initialValue: _selectedNode,
                                   decoration: const InputDecoration(
                                     border: OutlineInputBorder(),
                                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -499,7 +497,7 @@ class _NewStackDialogState extends State<NewStackDialog> {
                                                   initialName: _nameController.text.trim(),
                                                   yamlContent: _yamlController.text,
                                                 );
-                                                if (savedPath != null && mounted) {
+                                                if (savedPath != null && context.mounted) {
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     SnackBar(
                                                       content: Row(

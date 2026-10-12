@@ -244,85 +244,87 @@ class _CenturionsPageState extends State<CenturionsPage> {
     widget.onRefresh();
   }
 
-  void _showTokenMismatchDialog(Node node, [Map<String, dynamic>? res]) {
+  void _showTokenMismatchDialog(Node node) {
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          bool syncing = false;
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
-                const SizedBox(width: 8),
-                Text('Token Mismatch (${node.ip})'),
-              ],
-            ),
-            content: SizedBox(
-              width: 480,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) {
+        bool syncing = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Row(
                 children: [
-                  const Text(
-                    'Se han detectado peticiones rechazadas (HTTP 401 Unauthorized) desde este nodo Centurion. '
-                    'Esto ocurre típicamente cuando el token de unión del clúster fue regenerado en el Manager '
-                    'y el nodo Worker aún utiliza la credencial anterior.',
-                    style: TextStyle(fontSize: 13, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade700),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Centurion ID: ${node.id}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Text('Dirección IP: ${node.ip}', style: const TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        const Text('Estado: Autenticación Desincronizada', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ],
-                    ),
-                  ),
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+                  const SizedBox(width: 8),
+                  Text('Token Mismatch (${node.ip})'),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-                onPressed: syncing
-                    ? null
-                    : () async {
-                        setDialogState(() => syncing = true);
-                        final res = await ApiService.syncNodeToken(node.id);
-                        setDialogState(() => syncing = false);
-                        if (res['error'] != null) {
-                          _showSnackBar('Error al sincronizar token: ${res['error']}', isError: true);
-                        } else {
-                          _showSnackBar(res['message'] ?? 'Token sincronizado y worker reiniciado correctamente!');
-                          Navigator.pop(ctx);
-                          widget.onRefresh();
-                        }
-                      },
-                icon: syncing
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.sync_lock, size: 16),
-                label: Text(syncing ? 'Sincronizando...' : 'Auto-Sync vía SSH'),
+              content: SizedBox(
+                width: 480,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Se han detectado peticiones rechazadas (HTTP 401 Unauthorized) desde este nodo Centurion. '
+                      'Esto ocurre típicamente cuando el token de unión del clúster fue regenerado en el Manager '
+                      'y el nodo Worker aún utiliza la credencial anterior.',
+                      style: TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade700),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Centurion ID: ${node.id}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Text('Dirección IP: ${node.ip}', style: const TextStyle(fontSize: 12)),
+                          const SizedBox(height: 4),
+                          const Text('Estado: Autenticación Desincronizada', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          );
-        },
-      ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                  onPressed: syncing
+                      ? null
+                      : () async {
+                          setDialogState(() => syncing = true);
+                          final res = await ApiService.syncNodeToken(node.id);
+                          setDialogState(() => syncing = false);
+                          if (res['error'] != null) {
+                            _showSnackBar('Error al sincronizar token: ${res['error']}', isError: true);
+                          } else {
+                            _showSnackBar(res['message'] ?? 'Token sincronizado y worker reiniciado correctamente!');
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            widget.onRefresh();
+                          }
+                        },
+                  icon: syncing
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.sync_lock, size: 16),
+                  label: Text(syncing ? 'Sincronizando...' : 'Auto-Sync vía SSH'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -447,13 +449,13 @@ class _CenturionsPageState extends State<CenturionsPage> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: activeCount == totalCount
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.orange.withOpacity(0.1),
+                                ? Colors.green.withValues(alpha: 0.1)
+                                : Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: activeCount == totalCount
-                                  ? Colors.green.withOpacity(0.3)
-                                  : Colors.orange.withOpacity(0.3),
+                                  ? Colors.green.withValues(alpha: 0.3)
+                                  : Colors.orange.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Text(
@@ -644,7 +646,7 @@ class _CenturionsPageState extends State<CenturionsPage> {
                                                      scale: 0.8,
                                                      child: Switch(
                                                        value: n.status != 'no_schedule',
-                                                       activeColor: const Color(0xFF10B981),
+                                                       activeThumbColor: const Color(0xFF10B981),
                                                        inactiveThumbColor: Colors.deepOrange,
                                                        inactiveTrackColor: Colors.deepOrange.withValues(alpha: 0.2),
                                                        onChanged: (enabled) {
@@ -715,17 +717,29 @@ class _CenturionsPageState extends State<CenturionsPage> {
                                                  icon: const Icon(Icons.more_vert, size: 20),
                                                  tooltip: 'Node Actions',
                                                  onSelected: (action) {
-                                                   if (action == 'shell') _viewNodeShell(n.id, n.ip);
-                                                   else if (action == 'inspect') _showNodeInspectDialog(n);
-                                                   else if (action == 'labels') _showNodeLabelsDialog(n);
-                                                   else if (action == 'docker-daemon') _showDockerDaemonDialog(n.id);
-                                                   else if (action == 'reboot') _rebootNode(n.id);
-                                                   else if (action == 'activate') _updateNodeAvailability(n.id, 'active', n);
-                                                   else if (action == 'maintenance') _updateNodeAvailability(n.id, 'maintenance', n);
-                                                   else if (action == 'block-schedule') _updateNodeAvailability(n.id, 'no_schedule', n);
-                                                   else if (action == 'unblock-schedule') _updateNodeAvailability(n.id, 'active', n);
-                                                   else if (action == 'sync-token') _showTokenMismatchDialog(n);
-                                                   else if (action == 'leave') _leaveNode(n.id);
+                                                   if (action == 'shell') {
+                                                     _viewNodeShell(n.id, n.ip);
+                                                   } else if (action == 'inspect') {
+                                                     _showNodeInspectDialog(n);
+                                                   } else if (action == 'labels') {
+                                                     _showNodeLabelsDialog(n);
+                                                   } else if (action == 'docker-daemon') {
+                                                     _showDockerDaemonDialog(n.id);
+                                                   } else if (action == 'reboot') {
+                                                     _rebootNode(n.id);
+                                                   } else if (action == 'activate') {
+                                                     _updateNodeAvailability(n.id, 'active', n);
+                                                   } else if (action == 'maintenance') {
+                                                     _updateNodeAvailability(n.id, 'maintenance', n);
+                                                   } else if (action == 'block-schedule') {
+                                                     _updateNodeAvailability(n.id, 'no_schedule', n);
+                                                   } else if (action == 'unblock-schedule') {
+                                                     _updateNodeAvailability(n.id, 'active', n);
+                                                   } else if (action == 'sync-token') {
+                                                     _showTokenMismatchDialog(n);
+                                                   } else if (action == 'leave') {
+                                                     _leaveNode(n.id);
+                                                   }
                                                  },
                                                  itemBuilder: (context) => [
                                                     if (n.status != 'left' && n.status != 'down')

@@ -785,16 +785,18 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
                       if (newDomain.isEmpty) return;
                       setDialogState(() => saving = true);
                       final ok = await ApiService.updateClusterDomain(newDomain);
-                      if (mounted) {
+                      if (ctx.mounted) {
                         Navigator.of(ctx).pop();
+                      }
+                      if (mounted) {
                         if (ok) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          ScaffoldMessenger.of(this.context).showSnackBar(
                             SnackBar(content: Text('Cluster base domain updated to $newDomain and CoreDNS reloaded.')),
                           );
                           widget.onRefresh();
                           _loadSuiteData();
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          ScaffoldMessenger.of(this.context).showSnackBar(
                             const SnackBar(content: Text('Failed to update cluster domain.')),
                           );
                         }
@@ -1191,7 +1193,7 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<String>(
-                        value: _digRecordType,
+                        initialValue: _digRecordType,
                         decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder(), isDense: true),
                         items: const [
                           DropdownMenuItem(value: 'A', child: Text('A Record')),
@@ -1599,7 +1601,7 @@ class _AddCustomRecordDialogState extends State<_AddCustomRecordDialog> {
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
-                    value: _recordType,
+                    initialValue: _recordType,
                     decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder(), isDense: true),
                     items: const [
                       DropdownMenuItem(value: 'A', child: Text('A (IPv4)')),

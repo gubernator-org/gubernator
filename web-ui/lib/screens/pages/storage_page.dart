@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
-import '../../widgets/common_widgets.dart';
 
 /// Storage & Backups (The Granaries) — Multi-node persistent storage and backup suite.
 class StoragePage extends StatefulWidget {
@@ -42,7 +41,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
   String _backupSearch = '';
   String _mountSearch = '';
   String _mountTypeFilter = 'ALL';
-  String _poolPath = '/var/contenedores';
+  final String _poolPath = '/var/contenedores';
 
   // Cockpit-Storaged & Storage Network State
   StorageNetworkReportModel _storageNetworkReport = StorageNetworkReportModel.empty();
@@ -280,7 +279,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: selectedTargetNode,
+                      initialValue: selectedTargetNode,
                       decoration: const InputDecoration(
                         labelText: 'Target Centurion Node(s)',
                         prefixIcon: Icon(Icons.hub_outlined),
@@ -304,7 +303,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: selectedPerm,
+                      initialValue: selectedPerm,
                       decoration: const InputDecoration(
                         labelText: 'Filesystem Permissions (POSIX)',
                         prefixIcon: Icon(Icons.lock_outline),
@@ -358,7 +357,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                               permissions: selectedPerm,
                             );
                             if (ok) {
-                              Navigator.pop(ctx);
+                              if (ctx.mounted) Navigator.pop(ctx);
                               _showSnackBar('Directory created successfully on $selectedTargetNode');
                               _loadAllData();
                             } else {
@@ -557,7 +556,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                                     )
                                   : ListView.separated(
                                       itemCount: entries.length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
+                                      separatorBuilder: (_, _) => const Divider(height: 1),
                                       itemBuilder: (context, idx) {
                                         final item = entries[idx];
                                         return ListTile(
@@ -921,7 +920,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                                     )
                                   : ListView.separated(
                                       itemCount: entries.length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
+                                      separatorBuilder: (_, _) => const Divider(height: 1),
                                       itemBuilder: (context, idx) {
                                         final item = entries[idx];
                                         return ListTile(
@@ -1040,7 +1039,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: selectedDriver,
+                      initialValue: selectedDriver,
                       decoration: const InputDecoration(
                         labelText: 'Volume Driver',
                         prefixIcon: Icon(Icons.settings_suggest_outlined),
@@ -1069,9 +1068,9 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.12),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                         ),
                         child: const Row(
                           children: [
@@ -1089,7 +1088,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                     ],
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: selectedTargetNode,
+                      initialValue: selectedTargetNode,
                       decoration: const InputDecoration(
                         labelText: 'Target Centurion Host(s)',
                         prefixIcon: Icon(Icons.hub_outlined),
@@ -1144,7 +1143,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                               targetNode: selectedTargetNode,
                               driver: selectedDriver,
                             );
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnackBar('✅ $msg');
                             _loadAllData();
                           } catch (e) {
@@ -1206,7 +1205,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: selectedTargetNode,
+                      initialValue: selectedTargetNode,
                       decoration: const InputDecoration(
                         labelText: 'Target Centurion Host(s)',
                         prefixIcon: Icon(Icons.hub_outlined),
@@ -1249,7 +1248,7 @@ class _StoragePageState extends State<StoragePage> with SingleTickerProviderStat
                           setDlgState(() => isPruning = true);
                           try {
                             final report = await ApiService.pruneDockerVolumes(targetNode: selectedTargetNode);
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnackBar('🧹 $report');
                             _loadAllData();
                           } catch (e) {
@@ -1464,7 +1463,7 @@ volumes:
                           setDlgState(() => isDeleting = true);
                           try {
                             final msg = await ApiService.deleteDockerVolume(name: v.name, targetNode: v.nodeId);
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnackBar('🗑️ $msg');
                             _loadAllData();
                           } catch (e) {
@@ -1636,7 +1635,7 @@ volumes:
 
                       if (sourceMode == 'select' && selectableTargets.isNotEmpty) ...[
                         DropdownButtonFormField<String>(
-                          value: selectedTargetId,
+                          initialValue: selectedTargetId,
                           isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Select Discovered Volume, Pool or Stack',
@@ -1924,7 +1923,7 @@ volumes:
                       const SizedBox(height: 8),
                       if (widget.state.stacks.isNotEmpty) ...[
                         DropdownButtonFormField<String>(
-                          value: selectedStack.isNotEmpty ? selectedStack : null,
+                          initialValue: selectedStack.isNotEmpty ? selectedStack : null,
                           decoration: const InputDecoration(
                             labelText: 'Associated Stack (Legion) - Optional',
                             prefixIcon: Icon(Icons.layers_outlined),
@@ -1969,7 +1968,7 @@ volumes:
                             ),
                             Switch(
                               value: pauseContainer,
-                              activeColor: const Color(0xFF10B981),
+                              activeThumbColor: const Color(0xFF10B981),
                               onChanged: (val) => setDlgState(() => pauseContainer = val),
                             ),
                           ],
@@ -2021,7 +2020,7 @@ volumes:
                                 ),
                                 Switch(
                                   value: encryptBackup,
-                                  activeColor: const Color(0xFF10B981),
+                                  activeThumbColor: const Color(0xFF10B981),
                                   onChanged: (val) => setDlgState(() => encryptBackup = val),
                                 ),
                               ],
@@ -2479,7 +2478,7 @@ volumes:
                       if (targetType == 'stack') ...[
                         if (widget.state.stacks.isNotEmpty)
                           DropdownButtonFormField<String>(
-                            value: selectedStack.isNotEmpty ? selectedStack : null,
+                            initialValue: selectedStack.isNotEmpty ? selectedStack : null,
                             decoration: const InputDecoration(
                               labelText: 'Target Stack (Legion)',
                               prefixIcon: Icon(Icons.layers_outlined),
@@ -2508,7 +2507,7 @@ volumes:
                       ] else if (targetType == 'volume') ...[
                         if (selectableVolumes.isNotEmpty)
                           DropdownButtonFormField<String>(
-                            value: selectedVolumeId.isNotEmpty ? selectedVolumeId : selectableVolumes.first['id'],
+                            initialValue: selectedVolumeId.isNotEmpty ? selectedVolumeId : selectableVolumes.first['id'],
                             isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Select Discovered Volume or Mount',
@@ -2822,7 +2821,7 @@ volumes:
                           const Spacer(),
                           Switch(
                             value: pauseContainers,
-                            activeColor: const Color(0xFF8B5CF6),
+                            activeThumbColor: const Color(0xFF8B5CF6),
                             onChanged: (val) => setDlgState(() => pauseContainers = val),
                           ),
                         ],
@@ -2847,7 +2846,7 @@ volumes:
                           ),
                           Switch(
                             value: encrypted,
-                            activeColor: const Color(0xFF10B981),
+                            activeThumbColor: const Color(0xFF10B981),
                             onChanged: (val) => setDlgState(() => encrypted = val),
                           ),
                         ],
@@ -3277,7 +3276,7 @@ volumes:
                 )
               : ListView.separated(
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (ctx, i) {
                     final v = filtered[i];
                     final isDockerVol = v.type == 'docker_named';
@@ -3553,7 +3552,7 @@ volumes:
                 )
               : ListView.separated(
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (ctx, i) {
                     final b = filtered[i];
                     return Card(
@@ -3717,7 +3716,7 @@ volumes:
                 )
               : ListView.separated(
                   itemCount: _schedules.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (ctx, i) {
                     final s = _schedules[i];
                     return Card(
@@ -4636,7 +4635,7 @@ volumes:
                       const SizedBox(height: 12),
 
                       DropdownButtonFormField<String>(
-                        value: selectedTargetNode,
+                        initialValue: selectedTargetNode,
                         decoration: const InputDecoration(
                           labelText: 'Target Centurion Host',
                           helperText: 'Select "All Centurions" for cluster-wide container mobility, or target a specific node.',
@@ -4869,7 +4868,7 @@ volumes:
                               's3_access_key': s3AccessKeyCtrl.text.trim(),
                               's3_secret_key': s3SecretKeyCtrl.text.trim(),
                             });
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnackBar('✅ Network mount created and mounted successfully!');
                             _loadAllData();
                           } catch (e) {
@@ -4912,7 +4911,7 @@ volumes:
                     const Text('Select target Centurion host(s) on which to execute "mount -a":'),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedNode,
+                      initialValue: selectedNode,
                       decoration: const InputDecoration(
                         labelText: 'Target Centurion Host',
                         border: OutlineInputBorder(),
@@ -4956,7 +4955,7 @@ volumes:
                           setDlgState(() => isExecuting = true);
                           try {
                             final out = await ApiService.mountAllStorageEntries(targetNode: selectedNode);
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showMountAllResultDialog(out);
                             _loadAllData();
                           } catch (e) {
@@ -5067,7 +5066,7 @@ volumes:
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: selectedNode,
+                            initialValue: selectedNode,
                             decoration: const InputDecoration(
                               isDense: true,
                               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -5158,7 +5157,7 @@ volumes:
                           setDlgState(() => isSaving = true);
                           try {
                             final msg = await ApiService.saveRawFstab(contentCtrl.text, node: selectedNode);
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnackBar('✅ $msg');
                             _loadAllData();
                           } catch (e) {
@@ -6907,9 +6906,9 @@ volumes:
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.12),
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -6929,7 +6928,7 @@ volumes:
 
                       // Replication Strategy with clear explanation
                       DropdownButtonFormField<int>(
-                        value: replicaCount,
+                        initialValue: replicaCount,
                         decoration: const InputDecoration(
                           labelText: 'Replication Strategy (Mirror Multiplier)',
                           border: OutlineInputBorder(),
@@ -6959,7 +6958,7 @@ volumes:
 
                       // Storage Network Interface Selector
                       DropdownButtonFormField<String>(
-                        value: networkMode,
+                        initialValue: networkMode,
                         decoration: const InputDecoration(
                           labelText: 'Storage Network Interface / Subnet',
                           helperText: 'Select which network GlusterFS binds its bricks and replication traffic to.',
@@ -7003,7 +7002,7 @@ volumes:
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor.withOpacity(0.5),
+                          color: Theme.of(context).cardColor.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(8),
                           border: Border(
                             left: BorderSide(
@@ -7113,7 +7112,7 @@ volumes:
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.06),
+                                        color: Colors.white.withValues(alpha: 0.06),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -7148,9 +7147,9 @@ volumes:
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withOpacity(0.12),
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   children: [
@@ -7169,9 +7168,9 @@ volumes:
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withOpacity(0.12),
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   children: [
@@ -7218,7 +7217,7 @@ volumes:
                         title: const Text('Auto-Mount to Cluster Nodes'),
                         subtitle: const Text('Automatically writes /etc/fstab and mounts on selected nodes on creation'),
                         value: autoMount,
-                        activeColor: const Color(0xFF10B981),
+                        activeThumbColor: const Color(0xFF10B981),
                         onChanged: (val) => setDlgState(() => autoMount = val),
                       ),
                       const SizedBox(height: 8),
@@ -7226,7 +7225,7 @@ volumes:
                         title: const Text('Force Recreate / Purge Ghost Volume'),
                         subtitle: const Text('If a volume with this name already exists or is in an inconsistent state, automatically stop, purge, and recreate it cleanly'),
                         value: forceRecreate,
-                        activeColor: const Color(0xFF10B981),
+                        activeThumbColor: const Color(0xFF10B981),
                         onChanged: (val) => setDlgState(() => forceRecreate = val),
                       ),
                     ],
@@ -7368,7 +7367,7 @@ volumes:
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: selectedTarget,
+                      initialValue: selectedTarget,
                       decoration: const InputDecoration(
                         labelText: 'Target Centurion Node(s)',
                         border: OutlineInputBorder(),
@@ -7420,7 +7419,7 @@ volumes:
                               mountPoint: mountPointCtrl.text.trim(),
                               targetNodes: targetNodes,
                             );
-                            Navigator.pop(ctx);
+                            if (ctx.mounted) Navigator.pop(ctx);
                             _showSnackBar('✅ Volume $volumeName mounted successfully on target: $selectedTarget');
                             _loadAllData();
                           } catch (e) {
@@ -7832,7 +7831,7 @@ volumes:
                   try {
                     await ApiService.triggerGlusterSelfHeal(volumeName);
                     _showSnackBar('Self-heal cycle initiated for $volumeName');
-                    Navigator.pop(ctx);
+                    if (ctx.mounted) Navigator.pop(ctx);
                   } catch (e) {
                     _showSnackBar('Failed to trigger self-heal: $e', isError: true);
                   }
@@ -7867,17 +7866,6 @@ volumes:
     } catch (e) {
       _showErrorDialog('Stop Volume Failed', 'Failed to stop volume $name:\n\n$e');
       _showSnackBar('Failed to stop volume: $e', isError: true);
-    }
-  }
-
-  Future<void> _mountGlusterCluster(String name) async {
-    try {
-      await ApiService.mountGlusterCluster(name, mountPoint: '/var/contenedores');
-      _showSnackBar('Volume $name registered and mounted on /var/contenedores across cluster');
-      _loadAllData();
-    } catch (e) {
-      _showErrorDialog('Mount Volume Failed', 'Failed to mount volume $name:\n\n$e');
-      _showSnackBar('Failed to mount volume: $e', isError: true);
     }
   }
 

@@ -570,7 +570,7 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard> {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
         transform: _hovering
-            ? (Matrix4.identity()..translate(0.0, -2.0))
+            ? (Matrix4.identity()..translateByDouble(0.0, -2.0, 0.0, 1.0))
             : Matrix4.identity(),
         child: Card(
           child: Container(

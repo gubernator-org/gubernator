@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -14,7 +12,6 @@ import 'save_pc_stack_dialog.dart';
 import '../models/models.dart';
 import '../utils/clipboard_service.dart';
 import '../utils/compose_smart_merger.dart';
-import '../utils/download_service.dart';
 
 class ComposeEditorDialog extends StatefulWidget {
   final String stackName;
@@ -953,7 +950,7 @@ class _ComposeEditorDialogState extends State<ComposeEditorDialog> {
                                     initialName: widget.stackName,
                                     yamlContent: _controller.text,
                                   );
-                                  if (savedPath != null && mounted) {
+                                  if (savedPath != null && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Row(
@@ -1020,7 +1017,7 @@ class _ComposeEditorDialogState extends State<ComposeEditorDialog> {
                         initialName: widget.stackName,
                         yamlContent: _controller.text,
                       );
-                      if (savedPath != null && mounted) {
+                      if (savedPath != null && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Row(

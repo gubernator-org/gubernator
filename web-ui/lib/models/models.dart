@@ -1,4 +1,5 @@
 /// Data models matching the Go backend JSON responses.
+library;
 
 class Node {
   final String id;

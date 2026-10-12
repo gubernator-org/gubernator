@@ -29,7 +29,6 @@ class _ImageDistributeDialogState extends State<ImageDistributeDialog> {
   String? _errorMessage;
 
   List<Node> _nodes = [];
-  bool _loadingNodes = true;
 
   @override
   void initState() {
@@ -43,16 +42,9 @@ class _ImageDistributeDialogState extends State<ImageDistributeDialog> {
       if (mounted) {
         setState(() {
           _nodes = nodes;
-          _loadingNodes = false;
         });
       }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _loadingNodes = false;
-        });
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> _executeDistribution() async {
@@ -225,7 +217,7 @@ class _ImageDistributeDialogState extends State<ImageDistributeDialog> {
             ),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _selectedTarget,
+              initialValue: _selectedTarget,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.dns, size: 18),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

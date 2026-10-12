@@ -1464,7 +1464,7 @@ class _SLOFormDialogState extends State<_SLOFormDialog> {
                 const Text('Select Service:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: _serviceId.isNotEmpty ? _serviceId : null,
+                  initialValue: _serviceId.isNotEmpty ? _serviceId : null,
                   decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                   items: widget.services
                       .map<DropdownMenuItem<String>>((s) => DropdownMenuItem<String>(
@@ -1503,7 +1503,7 @@ class _SLOFormDialogState extends State<_SLOFormDialog> {
                         const Text('Time Window:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: _window,
+                          initialValue: _window,
                           decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                           items: const [
                             DropdownMenuItem(value: '30d', child: Text('30 Days (Standard)')),
@@ -1530,7 +1530,7 @@ class _SLOFormDialogState extends State<_SLOFormDialog> {
                         const Text('SLI Query Template:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: _template,
+                          initialValue: _template,
                           decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                           items: const [
                             DropdownMenuItem(value: 'caddy-http', child: Text('caddy-http (Reverse Proxy 5xx)')),

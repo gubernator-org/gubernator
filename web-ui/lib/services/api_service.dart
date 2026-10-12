@@ -547,7 +547,7 @@ class ApiService {
   }
 
   /// Updates a node's role (promote/demote). Deprecated in single-manager architecture.
-  @deprecated
+  @Deprecated('Deprecated in single-manager architecture')
   static Future<bool> updateNodeRole(String id, String role) async {
     final response = await http.post(
       Uri.parse('/api/node/$id/role'),

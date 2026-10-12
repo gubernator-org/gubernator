@@ -36,7 +36,6 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
   // WAF Threat Shield state
   Map<String, dynamic> _wafConfig = {};
   Map<String, dynamic> _wafStats = {};
-  List<dynamic> _wafRoutes = [];
   List<dynamic> _wafEvents = [];
   String _wafEventFilter = 'ALL';
   String _wafSimulateVector = 'SQLI';
@@ -90,7 +89,6 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
       final metrics = await ApiService.fetchCaddyMetrics(nodeId: _selectedCaddyNode);
       final wafCfg = await ApiService.fetchWAFConfig();
       final wafStats = await ApiService.fetchWAFStats();
-      final wafRoutes = await ApiService.fetchWAFRoutes();
       final wafEvts = await ApiService.fetchWAFEvents(limit: 50, type: _wafEventFilter);
 
       if (mounted) {
@@ -102,7 +100,6 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
           _metricsData = metrics;
           _wafConfig = wafCfg;
           _wafStats = wafStats;
-          _wafRoutes = wafRoutes;
           _wafEvents = wafEvts;
           _loading = false;
         });
@@ -271,7 +268,6 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
     showDialog(
       context: context,
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
           title: const Row(
             children: [
@@ -618,7 +614,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
                     children: [
                       _infoPill('Caddy Version', version, isDark),
                       const SizedBox(width: 12),
-                      _infoPill('Memory Usage', '${mem} MB', isDark),
+                      _infoPill('Memory Usage', '$mem MB', isDark),
                       const SizedBox(width: 12),
                       _infoPill('Uptime', '${(uptime / 3600).toStringAsFixed(1)} hrs', isDark),
                       const SizedBox(width: 12),
@@ -1786,7 +1782,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
               title: const Text('Enable Access Logging (log block in Caddyfile)'),
               subtitle: const Text('Streams JSON formatted request logs to container stdout'),
               value: _accessLoggingEnabled,
-              activeColor: const Color(0xFFF97316),
+              activeThumbColor: const Color(0xFFF97316),
               onChanged: (val) {
                 setState(() => _accessLoggingEnabled = val);
                 _showSnackBar('Access logging configuration updated!');
@@ -1811,11 +1807,11 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
         children: [
           Row(
             children: [
-              Expanded(child: _metricCard('Requests / sec', '${rps} RPS', Icons.speed, Colors.orange, theme)),
+              Expanded(child: _metricCard('Requests / sec', '$rps RPS', Icons.speed, Colors.orange, theme)),
               const SizedBox(width: 12),
-              Expanded(child: _metricCard('Avg Latency', '${latency} ms', Icons.timer, Colors.blue, theme)),
+              Expanded(child: _metricCard('Avg Latency', '$latency ms', Icons.timer, Colors.blue, theme)),
               const SizedBox(width: 12),
-              Expanded(child: _metricCard('p95 Latency', '${p95} ms', Icons.bar_chart, Colors.purple, theme)),
+              Expanded(child: _metricCard('p95 Latency', '$p95 ms', Icons.bar_chart, Colors.purple, theme)),
               const SizedBox(width: 12),
               Expanded(child: _metricCard('Total Requests', '$reqs', Icons.numbers, Colors.green, theme)),
             ],
@@ -1945,7 +1941,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
                       ),
                       Switch(
                         value: enabled,
-                        activeColor: const Color(0xFFF97316),
+                        activeThumbColor: const Color(0xFFF97316),
                         onChanged: (val) {
                           setState(() {
                             _wafConfig['enabled'] = val;
@@ -2115,7 +2111,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
                         const Text('Attack Vector to Simulate:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         DropdownButtonFormField<String>(
-                          value: _wafSimulateVector,
+                          initialValue: _wafSimulateVector,
                           decoration: const InputDecoration(isDense: true),
                           items: const [
                             DropdownMenuItem(value: 'SQLI', child: Text('SQLi: ?id=1+UNION+SELECT+1,2,3--')),
@@ -2309,7 +2305,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
           ),
           Switch(
             value: value,
-            activeColor: const Color(0xFFF97316),
+            activeThumbColor: const Color(0xFFF97316),
             onChanged: onChanged,
           ),
         ],

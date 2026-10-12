@@ -354,7 +354,7 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
         }
         if (anchorIdx != -1) {
           final anchorBlock = extractBlock(anchorIdx, anchorIndent);
-          blocks[name] = blockText + '\n' + anchorBlock;
+          blocks[name] = '$blockText\n$anchorBlock';
         }
       }
     }
@@ -409,7 +409,7 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
 
   String _truncateImage(String img) {
     if (img.length > 25) {
-      return img.substring(0, 22) + '...';
+      return '${img.substring(0, 22)}...';
     }
     return img;
   }
@@ -446,7 +446,7 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
   void _downloadFile(List<int> bytes, String filename, String mimeType) {
     final blob = html.Blob([bytes], mimeType);
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute("download", filename)
       ..click();
     html.Url.revokeObjectUrl(url);
@@ -461,10 +461,12 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
       if (byteData == null) return null;
       return byteData.buffer.asUint8List();
     } catch (e) {
-      print('Capture PNG error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to capture PNG: $e'), backgroundColor: Colors.red),
-      );
+      debugPrint('Capture PNG error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to capture PNG: $e'), backgroundColor: Colors.red),
+        );
+      }
       return null;
     }
   }
@@ -519,10 +521,12 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
       final jpgBytes = await completer.future;
       _downloadFile(jpgBytes, '${widget.stack.name}.jpg', 'image/jpeg');
     } catch (e) {
-      print('Export JPEG error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to export JPEG: $e'), backgroundColor: Colors.red),
-      );
+      debugPrint('Export JPEG error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to export JPEG: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -548,10 +552,12 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
       final pdfBytes = await pdf.save();
       _downloadFile(pdfBytes, '${widget.stack.name}.pdf', 'application/pdf');
     } catch (e) {
-      print('Export PDF error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to export PDF: $e'), backgroundColor: Colors.red),
-      );
+      debugPrint('Export PDF error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to export PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -623,9 +629,9 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
           // Arrow
           String points;
           if (arrowDir == 1) {
-            points = '${inX},${inY} ${inX - 8},${inY - 5} ${inX - 8},${inY + 5}';
+            points = '$inX,$inY ${inX - 8},${inY - 5} ${inX - 8},${inY + 5}';
           } else {
-            points = '${inX},${inY} ${inX + 8},${inY - 5} ${inX + 8},${inY + 5}';
+            points = '$inX,$inY ${inX + 8},${inY - 5} ${inX + 8},${inY + 5}';
           }
           buffer.writeln('  <polygon points="$points" fill="$connectionColorHex" />');
         }
@@ -675,7 +681,7 @@ class _StackDiagramDialogState extends State<StackDiagramDialog> {
       final svgBytes = utf8.encode(svgString);
       _downloadFile(svgBytes, '${widget.stack.name}.svg', 'image/svg+xml');
     } catch (e) {
-      print('Export SVG error: $e');
+      debugPrint('Export SVG error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to export SVG: $e'), backgroundColor: Colors.red),
       );

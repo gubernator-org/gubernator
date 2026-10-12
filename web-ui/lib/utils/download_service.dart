@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'dart:html' as html;
-import 'dart:js_util' as js_util;
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 /// Utility service to download files to the user's local workstation/computer from the browser.
 class DownloadService {
   /// Checks whether the browser supports the File System Access API (window.showSaveFilePicker).
   static bool get isFileSystemAccessSupported {
     try {
-      return js_util.hasProperty(html.window, 'showSaveFilePicker') &&
-          js_util.getProperty(html.window, 'showSaveFilePicker') != null;
+      return globalContext.has('showSaveFilePicker') &&
+          globalContext.getProperty('showSaveFilePicker'.toJS) != null;
     } catch (_) {
       return false;
     }
@@ -30,7 +31,7 @@ class DownloadService {
 
     if (isFileSystemAccessSupported) {
       try {
-        final options = js_util.jsify({
+        final options = {
           'suggestedName': fn,
           'types': [
             {
@@ -42,19 +43,29 @@ class DownloadService {
               }
             }
           ]
-        });
+        }.jsify();
 
-        final fileHandlePromise = js_util.callMethod(html.window, 'showSaveFilePicker', [options]);
-        final fileHandle = await js_util.promiseToFuture(fileHandlePromise);
+        final fileHandlePromise = globalContext.callMethod<JSPromise<JSObject>>(
+          'showSaveFilePicker'.toJS,
+          options,
+        );
+        final fileHandle = await fileHandlePromise.toDart;
 
-        final createWritablePromise = js_util.callMethod(fileHandle, 'createWritable', []);
-        final writable = await js_util.promiseToFuture(createWritablePromise);
+        final createWritablePromise = fileHandle.callMethod<JSPromise<JSObject>>(
+          'createWritable'.toJS,
+        );
+        final writable = await createWritablePromise.toDart;
 
-        final writePromise = js_util.callMethod(writable, 'write', [content]);
-        await js_util.promiseToFuture(writePromise);
+        final writePromise = writable.callMethod<JSPromise<JSAny?>>(
+          'write'.toJS,
+          content.toJS,
+        );
+        await writePromise.toDart;
 
-        final closePromise = js_util.callMethod(writable, 'close', []);
-        await js_util.promiseToFuture(closePromise);
+        final closePromise = writable.callMethod<JSPromise<JSAny?>>(
+          'close'.toJS,
+        );
+        await closePromise.toDart;
 
         return true;
       } catch (e) {

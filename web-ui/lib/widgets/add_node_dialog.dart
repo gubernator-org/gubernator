@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
@@ -25,7 +24,6 @@ class AddNodeDialog extends StatefulWidget {
 class _AddNodeDialogState extends State<AddNodeDialog> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   NodeJoinInfo? _joinInfo;
-  bool _loadingInfo = true;
 
   // Form Controllers
   final TextEditingController _hostController = TextEditingController();
@@ -65,7 +63,6 @@ class _AddNodeDialogState extends State<AddNodeDialog> with SingleTickerProvider
     if (mounted) {
       setState(() {
         _joinInfo = info;
-        _loadingInfo = false;
       });
     }
   }

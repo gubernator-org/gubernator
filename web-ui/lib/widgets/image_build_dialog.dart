@@ -39,7 +39,6 @@ class _ImageBuildDialogState extends State<ImageBuildDialog> {
 
   // Available cluster nodes
   List<Node> _nodes = [];
-  bool _loadingNodes = true;
 
   @override
   void initState() {
@@ -69,12 +68,9 @@ class _ImageBuildDialogState extends State<ImageBuildDialog> {
       if (mounted) {
         setState(() {
           _nodes = state.nodes;
-          _loadingNodes = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loadingNodes = false);
-    }
+    } catch (_) {}
   }
 
   void _applyTemplate(String template, String defaultTag) {
@@ -153,7 +149,7 @@ class _ImageBuildDialogState extends State<ImageBuildDialog> {
 
         if (res.success) {
           // Trigger security scan in background
-          ApiService.triggerImageScan(tag).catchError((_) => null);
+          ApiService.triggerImageScan(tag).catchError((_) => <String, dynamic>{});
           if (widget.onBuildSuccess != null) {
             widget.onBuildSuccess!();
           }

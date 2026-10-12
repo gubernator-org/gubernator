@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -2014,7 +2013,7 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                                   const Text('Max CPU:', style: TextStyle(fontSize: 10, color: Colors.grey)),
                                   const SizedBox(height: 4),
                                   DropdownButtonFormField<String>(
-                                    value: _customLimitCpu,
+                                    initialValue: _customLimitCpu,
                                     isDense: true,
                                     decoration: const InputDecoration(
                                       isDense: true,
@@ -2035,7 +2034,7 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                                   const Text('Max RAM:', style: TextStyle(fontSize: 10, color: Colors.grey)),
                                   const SizedBox(height: 4),
                                   DropdownButtonFormField<String>(
-                                    value: _customLimitRam,
+                                    initialValue: _customLimitRam,
                                     isDense: true,
                                     decoration: const InputDecoration(
                                       isDense: true,
@@ -2062,7 +2061,7 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                                   const Text('Min CPU:', style: TextStyle(fontSize: 10, color: Colors.grey)),
                                   const SizedBox(height: 4),
                                   DropdownButtonFormField<String>(
-                                    value: _customReserveCpu,
+                                    initialValue: _customReserveCpu,
                                     isDense: true,
                                     decoration: const InputDecoration(
                                       isDense: true,
@@ -2083,7 +2082,7 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                                   const Text('Min RAM:', style: TextStyle(fontSize: 10, color: Colors.grey)),
                                   const SizedBox(height: 4),
                                   DropdownButtonFormField<String>(
-                                    value: _customReserveRam,
+                                    initialValue: _customReserveRam,
                                     isDense: true,
                                     decoration: const InputDecoration(
                                       isDense: true,
@@ -2699,7 +2698,7 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF06B6D4).withOpacity(0.15),
+                          color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.hub, color: Color(0xFF06B6D4), size: 18),
@@ -2720,9 +2719,9 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF06B6D4).withOpacity(0.08),
+                      color: const Color(0xFF06B6D4).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.25)),
+                      border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.25)),
                     ),
                     child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4075,7 +4074,7 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
                     width: 280,
                     height: 38,
                     child: DropdownButtonFormField<String>(
-                      value: _selectedNode,
+                      initialValue: _selectedNode,
                       decoration: const InputDecoration(
                         labelText: 'Target Placement Node',
                         prefixIcon: Icon(Icons.memory, size: 16),
