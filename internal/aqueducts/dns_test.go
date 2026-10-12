@@ -121,7 +121,15 @@ func TestGenerateHostsFile_MultiNode_CleanMinimal(t *testing.T) {
 	testDB.Create(&db.Service{ID: "core-svc-caddy", StackID: "core-gbnt-stack", Name: "caddy"})
 	testDB.Create(&db.Service{ID: "core-svc-worker-caddy", StackID: "core-stack-node-gbnt-worker1", Name: "caddy"})
 	testDB.Create(&db.Service{ID: "sre-svc-loki", StackID: "sre-monitor-stack", Name: "loki"})
-	testDB.Create(&db.Service{ID: "svc-wp-app", StackID: "wp-stack", Name: "app"})
+	// Internal DB service without ingress.host
+	testDB.Create(&db.Service{ID: "svc-wp-db", StackID: "wp-stack", Name: "db"})
+	// WordPress service WITH ingress.host=wordpress.gbnt.local (single '=' from Compose labels)
+	testDB.Create(&db.Service{
+		ID:          "svc-wp-web",
+		StackID:     "wp-stack",
+		Name:        "wordpress",
+		Constraints: []string{"ingress.host=wordpress.gbnt.local"},
+	})
 
 	// 5. Tasks
 	testDB.Create(&db.Task{
@@ -146,11 +154,18 @@ func TestGenerateHostsFile_MultiNode_CleanMinimal(t *testing.T) {
 		ContainerIP: "172.18.0.4",
 	})
 	testDB.Create(&db.Task{
-		ID:          "task-wp-1",
-		ServiceID:   "svc-wp-app",
+		ID:          "task-wp-db",
+		ServiceID:   "svc-wp-db",
 		NodeID:      "node-gbnt-worker1",
 		Status:      "running",
 		ContainerIP: "172.18.0.5",
+	})
+	testDB.Create(&db.Task{
+		ID:          "task-wp-web",
+		ServiceID:   "svc-wp-web",
+		NodeID:      "node-gbnt-worker1",
+		Status:      "running",
+		ContainerIP: "172.18.0.6",
 	})
 
 	// Run GenerateHostsFile
@@ -182,34 +197,30 @@ func TestGenerateHostsFile_MultiNode_CleanMinimal(t *testing.T) {
 		t.Errorf("missing manager loki entry")
 	}
 
-	// Verify user app stack-scoped entries and inter-service aliases (must resolve to ContainerIP)
-	if !strings.Contains(content, "172.18.0.5\tapp.wordpress.gbnt.local") {
-		t.Errorf("missing user stack-scoped domain app.wordpress.gbnt.local")
+	// CRITICAL TEST 1: Service WITH ingress.host=wordpress.gbnt.local MUST point to the Worker Node IP (192.168.1.101)
+	// and MUST NOT emit internal 172.18.0.6 or duplicate host-qualified records!
+	if !strings.Contains(content, "192.168.1.101\twordpress.gbnt.local") {
+		t.Errorf("expected ingress.host wordpress.gbnt.local to resolve to worker node IP 192.168.1.101, got:\n%s", content)
 	}
-	if !strings.Contains(content, "172.18.0.5\tapp.wordpress.gbnt") {
-		t.Errorf("missing user stack-scoped domain app.wordpress.gbnt")
+	if strings.Contains(content, "172.18.0.6") {
+		t.Errorf("service with ingress.host must NOT publish internal bridge IP 172.18.0.6 in CoreDNS, got:\n%s", content)
 	}
-	if !strings.Contains(content, "172.18.0.5\tapp.wordpress") {
-		t.Errorf("missing user stack alias app.wordpress")
-	}
-	if !strings.Contains(content, "172.18.0.5\tapp.gbnt.local") {
-		t.Errorf("missing user domain alias app.gbnt.local")
-	}
-	if !strings.Contains(content, "172.18.0.5\tapp.gbnt") {
-		t.Errorf("missing user domain alias app.gbnt")
-	}
-	if !strings.Contains(content, "172.18.0.5\tapp") {
-		t.Errorf("missing bare user service alias app")
-	}
-	// Verify host-qualified domain resolves to node LAN IP
-	if !strings.Contains(content, "192.168.1.101\tnode-gbnt-worker1.app.gbnt.local") {
-		t.Errorf("missing host-qualified domain node-gbnt-worker1.app.gbnt.local")
-	}
-	if !strings.Contains(content, "192.168.1.101\tnode-gbnt-worker1.app.gbnt") {
-		t.Errorf("missing host-qualified domain node-gbnt-worker1.app.gbnt")
+	if strings.Contains(content, "node-gbnt-worker1.wordpress") || strings.Contains(content, "wordpress.wordpress") {
+		t.Errorf("service with ingress.host must NOT pollute CoreDNS with duplicate host/stack records, got:\n%s", content)
 	}
 
-	// CRITICAL TEST: Verify that generic "caddy.gbnt.local" or "loki.gbnt.local" are NOT present to prevent collisions
+	// Verify internal DB service (without ingress.host) stack-scoped entries
+	if !strings.Contains(content, "172.18.0.5\tdb.wordpress.gbnt.local") {
+		t.Errorf("missing internal stack-scoped domain db.wordpress.gbnt.local")
+	}
+	if !strings.Contains(content, "172.18.0.5\tdb.wordpress.gbnt") {
+		t.Errorf("missing internal stack-scoped domain db.wordpress.gbnt")
+	}
+	if !strings.Contains(content, "192.168.1.101\tnode-gbnt-worker1.db.gbnt.local") {
+		t.Errorf("missing host-qualified domain node-gbnt-worker1.db.gbnt.local")
+	}
+
+	// CRITICAL TEST 2: Verify that generic "caddy.gbnt.local" or "loki.gbnt.local" are NOT present to prevent collisions
 	for _, l := range lines {
 		fields := strings.Fields(l)
 		if len(fields) >= 2 {
@@ -243,7 +254,7 @@ func TestGenerateHostsFile_MultiNode_CleanMinimal(t *testing.T) {
 	if !strings.Contains(customContent, "node-gbnt-worker1.caddy.acme.corp") {
 		t.Errorf("missing node-gbnt-worker1.caddy.acme.corp")
 	}
-	if !strings.Contains(customContent, "app.wordpress.acme.corp") {
-		t.Errorf("missing app.wordpress.acme.corp")
+	if !strings.Contains(customContent, "db.wordpress.acme.corp") {
+		t.Errorf("missing db.wordpress.acme.corp")
 	}
 }

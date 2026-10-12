@@ -1,9 +1,10 @@
 package aqueducts
 
-import (
+	import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -33,6 +34,8 @@ func GenerateCaddyfile() {
 
 	// hostUpstreams groups container IPs per ingress hostname to avoid duplicate blocks.
 	hostUpstreams := make(map[string][]string)
+	// workerHostUpstreams maps workerNodeIP -> ingressHost -> []containerUpstream ("172.18.0.5:80")
+	workerHostUpstreams := make(map[string]map[string][]string)
 	// hostTLS stores optional custom TLS configuration per hostname (e.g. email, "internal", "off").
 	hostTLS := make(map[string]string)
 	// hostLBPolicy stores the load balancing algorithm per hostname (round_robin, least_conn, ip_hash)
@@ -72,9 +75,10 @@ func GenerateCaddyfile() {
 					val = strings.TrimSpace(parts[1])
 				}
 			}
+			val = strings.Trim(val, "\"'")
 
 			switch key {
-			case "ingress.host", "node.labels.gbnt.ingress.host", "gbnt.ingress.host":
+			case "ingress.host", "node.labels.gbnt.ingress.host", "gbnt.ingress.host", "gbnt.caddy.host":
 				ingressHost = val
 			case "ingress.email", "node.labels.gbnt.ingress.email", "gbnt.ingress.email":
 				ingressEmail = val
@@ -155,6 +159,30 @@ func GenerateCaddyfile() {
 				} else if t.ContainerIP != "" {
 					targetIP = t.ContainerIP
 				}
+
+				// Record the local container upstream on this worker node so the worker's gbnt-caddy
+				// can directly serve both HTTPS (https://<ingressHost>/) and HTTP (http://<ingressHost>/)
+				if node.IP != "" && node.IP != "127.0.0.1" && t.ContainerIP != "" && t.ContainerIP != "invalid" {
+					workerContainerPort := defaultPort
+					if caddyPort != "" {
+						workerContainerPort = caddyPort
+					}
+					if workerHostUpstreams[node.IP] == nil {
+						workerHostUpstreams[node.IP] = make(map[string][]string)
+					}
+					workerUpstream := fmt.Sprintf("%s:%s", t.ContainerIP, workerContainerPort)
+					alreadyInWorker := false
+					for _, u := range workerHostUpstreams[node.IP][ingressHost] {
+						if u == workerUpstream {
+							alreadyInWorker = true
+							break
+						}
+					}
+					if !alreadyInWorker {
+						workerHostUpstreams[node.IP][ingressHost] = append(workerHostUpstreams[node.IP][ingressHost], workerUpstream)
+					}
+				}
+
 				// Determine reachable upstream port on the worker host:
 				// If the container published a public host port on the worker, route to it.
 				// Otherwise, route to the worker node's Caddy Ingress on port 80.
@@ -334,5 +362,63 @@ func GenerateCaddyfile() {
 	slog.Info("aqueducts: generated new Caddyfile")
 	if err := caddy.ReloadConfig(); err != nil {
 		slog.Warn("aqueducts: Caddy reload failed", "err", err)
+	}
+
+	// Synchronize per-worker Caddyfiles to active worker nodes so that direct HTTPS/HTTP
+	// requests to the worker node IP (published in CoreDNS) route directly to local containers.
+	for workerIP, hostMap := range workerHostUpstreams {
+		workerBody := "# Gubernator Auto-Generated Worker Caddyfile\n\n"
+		for _, host := range hostOrder {
+			wUpstreams := hostMap[host]
+			if len(wUpstreams) == 0 {
+				continue
+			}
+			tlsDirective := ""
+			tlsOpt := hostTLS[host]
+			if tlsOpt == "internal" || (tlsOpt == "" && caddy.IsLocalDomain(host)) {
+				tlsDirective = "\ttls internal\n"
+			} else if tlsOpt == "off" || tlsOpt == "none" {
+				tlsDirective = ""
+			} else if strings.Contains(tlsOpt, "@") {
+				tlsDirective = fmt.Sprintf("\ttls %s\n", tlsOpt)
+			} else if tlsOpt != "" && tlsOpt != "letsencrypt" && tlsOpt != "auto" {
+				tlsDirective = fmt.Sprintf("\ttls %s\n", tlsOpt)
+			}
+			upstreamJoined := strings.Join(wUpstreams, " ")
+			// Serve both plain HTTP (for Manager-to-Worker proxy or HTTP clients) and HTTPS (for direct browser TLS)
+			workerBody += fmt.Sprintf("http://%s {\n\treverse_proxy %s\n}\n\n", host, upstreamJoined)
+			workerBody += fmt.Sprintf("%s {\n%s\treverse_proxy %s\n}\n\n", host, tlsDirective, upstreamJoined)
+		}
+		go syncWorkerCaddyfile(workerIP, workerBody)
+	}
+}
+
+// syncWorkerCaddyfile updates the Caddyfile inside gbnt-caddy-conf volume on a remote worker node
+// and reloads gbnt-caddy via SSH.
+func syncWorkerCaddyfile(workerIP, caddyfileContent string) {
+	if workerIP == "" || workerIP == "127.0.0.1" || workerIP == "localhost" {
+		return
+	}
+	sshArgs := []string{"-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5"}
+	keyCandidates := []string{
+		"/root/.ssh/id_ed25519", "/root/.ssh/id_rsa",
+		"/data/id_ed25519", "/data/id_rsa",
+		"/data/ssh/id_ed25519", "/data/ssh/id_rsa",
+	}
+	for _, k := range keyCandidates {
+		if _, err := os.Stat(k); err == nil {
+			sshArgs = append(sshArgs, "-i", k)
+			break
+		}
+	}
+
+	remoteCmd := "sudo docker run --rm -i -v gbnt-caddy-conf:/data alpine:latest sh -c 'cat > /data/Caddyfile' && sudo docker exec gbnt-caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null || true"
+	args := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", workerIP), remoteCmd)
+	cmd := exec.Command("ssh", args...)
+	cmd.Stdin = strings.NewReader(caddyfileContent)
+	if err := cmd.Run(); err != nil {
+		slog.Debug("aqueducts: worker Caddyfile sync skipped or failed", "worker_ip", workerIP, "err", err)
+	} else {
+		slog.Info("aqueducts: synchronized and reloaded Caddyfile on worker node", "worker_ip", workerIP)
 	}
 }

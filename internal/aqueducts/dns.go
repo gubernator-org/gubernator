@@ -60,9 +60,44 @@ func isSystemStack(stackID, stackName string) bool {
 		strings.Contains(sName, "monitor")
 }
 
+// ExtractIngressHosts parses service constraints/labels (supporting both "==" and "=")
+// and returns any configured ingress hostnames (e.g., ingress.host=wordpress.gbnt.local).
+func ExtractIngressHosts(svc db.Service) []string {
+	var hosts []string
+	seen := make(map[string]bool)
+	for _, constraint := range svc.Constraints {
+		var key, val string
+		if strings.Contains(constraint, "==") {
+			parts := strings.SplitN(constraint, "==", 2)
+			if len(parts) == 2 {
+				key = strings.TrimSpace(parts[0])
+				val = strings.TrimSpace(parts[1])
+			}
+		} else if strings.Contains(constraint, "=") {
+			parts := strings.SplitN(constraint, "=", 2)
+			if len(parts) == 2 {
+				key = strings.TrimSpace(parts[0])
+				val = strings.TrimSpace(parts[1])
+			}
+		}
+		val = strings.Trim(val, "\"'")
+		if val == "" {
+			continue
+		}
+		switch key {
+		case "ingress.host", "gbnt.ingress.host", "node.labels.gbnt.ingress.host", "gbnt.caddy.host":
+			if !seen[val] {
+				seen[val] = true
+				hosts = append(hosts, val)
+			}
+		}
+	}
+	return hosts
+}
+
 // GenerateHostsFile queries the DB for all running tasks and regenerates the CoreDNS hosts file.
-// Emits clean, minimal, host-qualified DNS entries (<node>.<service>.gbnt.local and <node>.<service>.gbnt)
-// and stack-scoped entries for user applications (<service>.<stack>.gbnt.local).
+// Services with an explicit ingress.host label publish ONLY their ingress domain mapped to the
+// deployed node's LAN IP (aligned with Caddy Ingress), avoiding noisy internal bridge IP records.
 func GenerateHostsFile() {
 	aqueductMutex.Lock()
 	defer aqueductMutex.Unlock()
@@ -84,6 +119,7 @@ func GenerateHostsFile() {
 	content += "# Format: <IP> <domain>\n\n"
 
 	seenRecords := make(map[string]bool)
+	claimedDomains := make(map[string]bool)
 	addRecord := func(ip, domain string) {
 		ip = strings.TrimSpace(ip)
 		domain = strings.TrimSpace(domain)
@@ -100,11 +136,67 @@ func GenerateHostsFile() {
 		}
 	}
 
+	// 1. First pass: Publish Ingress Domains (ingress.host) aligned with the deployed Node IP (Caddy Ingress)
+	ingressServiceIDs := make(map[string]bool)
+	var services []db.Service
+	if err := db.DB.Find(&services).Error; err == nil {
+		for _, svc := range services {
+			ingressHosts := ExtractIngressHosts(svc)
+			if len(ingressHosts) == 0 {
+				continue
+			}
+			ingressServiceIDs[svc.ID] = true
+
+			var svcTasks []db.Task
+			_ = db.DB.Where("service_id = ? AND status = ?", svc.ID, "running").Find(&svcTasks)
+
+			var nodeIPOrder []string
+			nodeIPSeen := make(map[string]bool)
+			for _, t := range svcTasks {
+				var ip string
+				if t.NodeID == "node-local-manager" || t.NodeID == "" || strings.Contains(strings.ToLower(t.NodeID), "manager") {
+					ip = hostIP
+				} else {
+					var node db.Node
+					if err := db.DB.First(&node, "id = ?", t.NodeID).Error; err == nil && node.IP != "" {
+						ip = node.IP
+					}
+				}
+				if ip == "" || ip == "invalid" || strings.Contains(ip, "invalid") || net.ParseIP(ip) == nil {
+					ip = hostIP
+				}
+				if !nodeIPSeen[ip] {
+					nodeIPSeen[ip] = true
+					nodeIPOrder = append(nodeIPOrder, ip)
+				}
+			}
+
+			for _, h := range ingressHosts {
+				if len(nodeIPOrder) > 0 {
+					for _, ip := range nodeIPOrder {
+						addRecord(ip, h)
+					}
+					claimedDomains[strings.ToLower(h)] = true
+				} else if !claimedDomains[strings.ToLower(h)] {
+					// Fallback if no tasks are running yet, point to Manager IP
+					addRecord(hostIP, h)
+					claimedDomains[strings.ToLower(h)] = true
+				}
+			}
+		}
+	}
+
+	// 2. Second pass: Internal & System services WITHOUT ingress.host
 	for _, t := range tasks {
 		var svc db.Service
 		if err := db.DB.First(&svc, "id = ?", t.ServiceID).Error; err != nil {
 			continue
 		}
+		// Skip noisy internal/host-qualified auto-records for services that explicitly publish via ingress.host
+		if ingressServiceIDs[svc.ID] || len(ExtractIngressHosts(svc)) > 0 {
+			continue
+		}
+
 		var stack db.Stack
 		if err := db.DB.First(&stack, "id = ?", svc.StackID).Error; err != nil {
 			continue
@@ -142,72 +234,39 @@ func GenerateHostsFile() {
 		}
 
 		clusterDomain := db.GetClusterDomain()
-
-		// 1. Host-Qualified Domain (<node>.<service>.<clusterDomain> and <node>.<service>.gbnt)
-		addRecord(nodeIP, fmt.Sprintf("%s.%s.%s", cleanNode, cleanSvc, clusterDomain))
-		if clusterDomain != "gbnt" {
-			addRecord(nodeIP, fmt.Sprintf("%s.%s.gbnt", cleanNode, cleanSvc))
-		}
-
-		// If manager node is identified as node-local-manager, also alias manager
-		if (t.NodeID == "node-local-manager" || t.NodeID == "") && cleanNode != "manager" {
-			addRecord(nodeIP, fmt.Sprintf("manager.%s.%s", cleanSvc, clusterDomain))
-			if clusterDomain != "gbnt" {
-				addRecord(nodeIP, fmt.Sprintf("manager.%s.gbnt", cleanSvc))
+		addInternalRecord := func(ip, domain string) {
+			if claimedDomains[strings.ToLower(domain)] {
+				return
 			}
+			addRecord(ip, domain)
 		}
 
-		// 2. User Application Stacks: Stack-Scoped Domain (<service>.<stack>.<clusterDomain>, <service>.<stack>.gbnt, <service>.<stack>)
-		// and inter-service aliases (<service>.<clusterDomain>, <service>.gbnt, <service>)
-		if !isSystemStack(stack.ID, stack.Name) {
+		if isSystemStack(stack.ID, stack.Name) {
+			// System Stack: Host-Qualified Domain (<node>.<service>.<clusterDomain> and <node>.<service>.gbnt)
+			addInternalRecord(nodeIP, fmt.Sprintf("%s.%s.%s", cleanNode, cleanSvc, clusterDomain))
+			if clusterDomain != "gbnt" {
+				addInternalRecord(nodeIP, fmt.Sprintf("%s.%s.gbnt", cleanNode, cleanSvc))
+			}
+			if (t.NodeID == "node-local-manager" || t.NodeID == "") && cleanNode != "manager" {
+				addInternalRecord(nodeIP, fmt.Sprintf("manager.%s.%s", cleanSvc, clusterDomain))
+				if clusterDomain != "gbnt" {
+					addInternalRecord(nodeIP, fmt.Sprintf("manager.%s.gbnt", cleanSvc))
+				}
+			}
+		} else {
+			// Internal User Service (without ingress.host, e.g. db):
+			// Emit only stack-scoped domains (<service>.<stack>.<clusterDomain> and <service>.<stack>.gbnt)
+			// and host-qualified domains (<node>.<service>.<clusterDomain>)
 			cleanStack := SanitizeDNSLabel(stack.Name)
 			if cleanStack != "" {
-				addRecord(serviceIP, fmt.Sprintf("%s.%s.%s", cleanSvc, cleanStack, clusterDomain))
+				addInternalRecord(serviceIP, fmt.Sprintf("%s.%s.%s", cleanSvc, cleanStack, clusterDomain))
 				if clusterDomain != "gbnt" {
-					addRecord(serviceIP, fmt.Sprintf("%s.%s.gbnt", cleanSvc, cleanStack))
+					addInternalRecord(serviceIP, fmt.Sprintf("%s.%s.gbnt", cleanSvc, cleanStack))
 				}
-				addRecord(serviceIP, fmt.Sprintf("%s.%s", cleanSvc, cleanStack))
 			}
-			addRecord(serviceIP, fmt.Sprintf("%s.%s", cleanSvc, clusterDomain))
+			addInternalRecord(nodeIP, fmt.Sprintf("%s.%s.%s", cleanNode, cleanSvc, clusterDomain))
 			if clusterDomain != "gbnt" {
-				addRecord(serviceIP, fmt.Sprintf("%s.gbnt", cleanSvc))
-			}
-			addRecord(serviceIP, cleanSvc)
-		}
-	}
-
-	// Add records for ingress.host to point to the correct node IPs where the tasks are running
-	var services []db.Service
-	if err := db.DB.Find(&services).Error; err == nil {
-		seenHosts := make(map[string]bool)
-		for _, svc := range services {
-			for _, constraint := range svc.Constraints {
-				parts := strings.Split(constraint, "==")
-				if len(parts) == 2 {
-					key := strings.TrimSpace(parts[0])
-					val := strings.TrimSpace(parts[1])
-					if key == "ingress.host" || key == "node.labels.gbnt.ingress.host" {
-						// Find all running tasks for this service
-						var tasks []db.Task
-						if err := db.DB.Where("service_id = ? AND status = ?", svc.ID, "running").Find(&tasks).Error; err == nil && len(tasks) > 0 {
-							nodeIPs := make(map[string]bool)
-							for _, t := range tasks {
-								var node db.Node
-								if err := db.DB.First(&node, "id = ?", t.NodeID).Error; err == nil && node.IP != "" {
-									nodeIPs[node.IP] = true
-								}
-							}
-							for ip := range nodeIPs {
-								addRecord(ip, val)
-							}
-							seenHosts[val] = true
-						} else if !seenHosts[val] {
-							// Fallback if no tasks are running yet, point to Manager IP
-							seenHosts[val] = true
-							addRecord(hostIP, val)
-						}
-					}
-				}
+				addInternalRecord(nodeIP, fmt.Sprintf("%s.%s.gbnt", cleanNode, cleanSvc))
 			}
 		}
 	}

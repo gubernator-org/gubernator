@@ -17,6 +17,16 @@ func TestGenerateCaddyfile_MultiUpstreamLoadBalancing(t *testing.T) {
 	caddyTestMutex.Lock()
 	defer caddyTestMutex.Unlock()
 
+	tmpDir, err := os.MkdirTemp("", "gbnt-caddy-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", origHome) }()
+
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=private", t.Name())
 	if err := db.Init(dsn); err != nil {
 		t.Fatalf("db.Init failed: %v", err)

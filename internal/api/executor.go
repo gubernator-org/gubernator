@@ -225,8 +225,20 @@ func executeRemoteWorkerTask(task db.Task, svc db.Service, node db.Node) {
 		return
 	}
 
-	// 3. Connect container to gbnt-net for cluster-wide inter-service DNS and Caddy ingress
-	connCmd := fmt.Sprintf("sudo docker network create gbnt-net 2>/dev/null || true; sudo docker network connect gbnt-net '%s' 2>/dev/null || true", containerName)
+	// 3. Connect container to gbnt-net with service and stack DNS aliases for inter-service communication and Caddy ingress
+	cleanSvcAlias := aqueducts.SanitizeDNSLabel(svc.Name)
+	aliasFlags := ""
+	if cleanSvcAlias != "" {
+		aliasFlags = fmt.Sprintf("--alias '%s'", cleanSvcAlias)
+		var stack db.Stack
+		if err := db.DB.First(&stack, "id = ?", svc.StackID).Error; err == nil {
+			cleanStackAlias := aqueducts.SanitizeDNSLabel(stack.Name)
+			if cleanStackAlias != "" {
+				aliasFlags += fmt.Sprintf(" --alias '%s.%s.gbnt' --alias '%s.%s.gbnt.local'", cleanSvcAlias, cleanStackAlias, cleanSvcAlias, cleanStackAlias)
+			}
+		}
+	}
+	connCmd := fmt.Sprintf("sudo docker network create gbnt-net 2>/dev/null || true; sudo docker network connect %s gbnt-net '%s' 2>/dev/null || true", aliasFlags, containerName)
 	connSSHArgs := append(append([]string{}, sshArgs...), fmt.Sprintf("ubuntu@%s", node.IP), connCmd)
 	_ = exec.Command("ssh", connSSHArgs...).Run()
 
