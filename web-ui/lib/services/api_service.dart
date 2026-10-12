@@ -3,6 +3,13 @@ import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 
+
+part 'api/cluster_api_part.dart';
+part 'api/observability_waf_api_part.dart';
+part 'api/auth_security_api_part.dart';
+part 'api/storage_gluster_api_part.dart';
+part 'api/image_compliance_api_part.dart';
+
 /// Service class to communicate with the Gubernator backend API.
 class ApiService {
   static String? _authToken;
@@ -37,100 +44,39 @@ class ApiService {
     return headers;
   }
 
+
   /// Fetches the full dashboard state from the backend.
-  static Future<DashboardState> fetchState() async {
-    final response = await http.get(Uri.parse('/api/state'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return DashboardState.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch state: ${response.statusCode}');
-  }
+  static Future<DashboardState> fetchState() => ClusterApi.fetchState();
 
   /// Fetches all cluster Centurion nodes.
-  static Future<List<Node>> fetchNodes() async {
-    final state = await fetchState();
-    return state.nodes;
-  }
+  static Future<List<Node>> fetchNodes() => ClusterApi.fetchNodes();
 
   /// Deletes a stack and stops all its containers.
-  static Future<bool> deleteStack(String id) async {
-    final response = await http.delete(Uri.parse('/api/stack/$id'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteStack(String id) => ClusterApi.deleteStack(id);
 
   /// Stops all containers in a stack without deleting it.
-  static Future<bool> stopStack(String id) async {
-    final response = await http.post(Uri.parse('/api/stack/$id/stop'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> stopStack(String id) => ClusterApi.stopStack(id);
 
   /// Starts all containers in a stopped stack.
-  static Future<bool> startStack(String id) async {
-    final response = await http.post(Uri.parse('/api/stack/$id/start'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> startStack(String id) => ClusterApi.startStack(id);
 
   /// Redeploys a stack.
-  static Future<bool> redeployStack(String id) async {
-    final response = await http.post(Uri.parse('/api/stack/$id/redeploy'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> redeployStack(String id) => ClusterApi.redeployStack(id);
 
   /// Restarts all containers in a stack.
-  static Future<bool> restartStack(String id) async {
-    final response = await http.post(Uri.parse('/api/stack/$id/restart'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> restartStack(String id) => ClusterApi.restartStack(id);
 
   /// Reconciles a single stack, purging dead/stale containers and aligning tasks with desired replicas.
-  static Future<Map<String, dynamic>?> reconcileStack(String id) async {
-    try {
-      final response = await http.post(Uri.parse('/api/stack/$id/reconcile'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<Map<String, dynamic>?> reconcileStack(String id) => ClusterApi.reconcileStack(id);
 
   /// Updates horizontal autoscaling configuration for a specific service.
-  static Future<bool> updateServiceAutoscale(String serviceId, Map<String, dynamic> config) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/services/$serviceId/autoscale'),
-        headers: authHeaders,
-        body: jsonEncode(config),
-      );
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
+  static Future<bool> updateServiceAutoscale(String serviceId, Map<String, dynamic> config) => ClusterApi.updateServiceAutoscale(serviceId, config);
 
   /// Updates horizontal autoscaling configuration for all services in a stack.
-  static Future<bool> updateStackAutoscale(String stackId, Map<String, dynamic> config) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/stack/$stackId/autoscale'),
-        headers: authHeaders,
-        body: jsonEncode(config),
-      );
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
+  static Future<bool> updateStackAutoscale(String stackId, Map<String, dynamic> config) => ClusterApi.updateStackAutoscale(stackId, config);
 
   /// Prunes all dead, duplicate, and orphan containers across the cluster.
-  static Future<Map<String, dynamic>?> pruneTasks() async {
-    try {
-      final response = await http.post(Uri.parse('/api/tasks/prune'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<Map<String, dynamic>?> pruneTasks() => ClusterApi.pruneTasks();
 
   /// Deploys a stack with full conflict detection and resolution options.
   static Future<DeployStackResult> deployStackDetailed(
@@ -139,61 +85,7 @@ class ApiService {
     String? targetNode,
     bool force = false,
     bool autoRemapPorts = false,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/stack'),
-        headers: authHeaders,
-        body: jsonEncode({
-          'name': name,
-          'compose': compose,
-          'target_node': targetNode,
-          'force': force,
-          'auto_remap_ports': autoRemapPorts,
-        }),
-      );
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        final rawConflicts = (body['remapped_conflicts'] as List<dynamic>?) ?? [];
-        final conflicts = rawConflicts
-            .map((c) => PortConflictModel.fromJson(c as Map<String, dynamic>))
-            .toList();
-        return DeployStackResult(
-          success: true,
-          stackId: body['stack_id'] as String?,
-          remappedCompose: body['compose'] as String?,
-          conflicts: conflicts,
-        );
-      } else if (response.statusCode == 409) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        final rawConflicts = (body['conflicts'] as List<dynamic>?) ?? [];
-        final conflicts = rawConflicts
-            .map((c) => PortConflictModel.fromJson(c as Map<String, dynamic>))
-            .toList();
-        return DeployStackResult(
-          success: false,
-          error: body['message'] as String? ?? 'Host port conflict detected',
-          isConflict: true,
-          conflicts: conflicts,
-        );
-      } else {
-        try {
-          final body = jsonDecode(response.body);
-          return DeployStackResult(
-            success: false,
-            error: body['error'] ?? 'Server error: ${response.statusCode}',
-          );
-        } catch (_) {
-          return DeployStackResult(
-            success: false,
-            error: 'Server error: ${response.statusCode}',
-          );
-        }
-      }
-    } catch (e) {
-      return DeployStackResult(success: false, error: e.toString());
-    }
-  }
+  }) => ClusterApi.deployStackDetailed(name, compose, targetNode: targetNode, force: force, autoRemapPorts: autoRemapPorts);
 
   static Future<String?> deployStack(
     String name,
@@ -201,16 +93,7 @@ class ApiService {
     String? targetNode,
     bool force = false,
     bool autoRemapPorts = false,
-  }) async {
-    final res = await deployStackDetailed(
-      name,
-      compose,
-      targetNode: targetNode,
-      force: force,
-      autoRemapPorts: autoRemapPorts,
-    );
-    return res.success ? null : res.error;
-  }
+  }) => ClusterApi.deployStack(name, compose, targetNode: targetNode, force: force, autoRemapPorts: autoRemapPorts);
 
   /// Saves stack compose definition into DB and ~/.gbnt/stacks/ without deploying/launching containers.
   static Future<Map<String, dynamic>> saveStack({
@@ -218,86 +101,16 @@ class ApiService {
     required String compose,
     String? stackId,
     String? targetNode,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/stack/save'),
-        headers: authHeaders,
-        body: jsonEncode({
-          'id': stackId,
-          'name': name,
-          'compose': compose,
-          'target_node': targetNode,
-        }),
-      );
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return body;
-    } catch (e) {
-      return {'error': e.toString()};
-    }
-  }
+  }) => ClusterApi.saveStack(name: name, compose: compose, stackId: stackId, targetNode: targetNode);
 
   /// Lists Compose stack files found on the Master server host.
-  static Future<Map<String, dynamic>> fetchServerStackFiles({String? dir}) async {
-    final uri = (dir != null && dir.isNotEmpty)
-        ? Uri.parse('/api/stacks/server-files?dir=${Uri.encodeQueryComponent(dir)}')
-        : Uri.parse('/api/stacks/server-files');
-    final response = await http.get(uri, headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final files = (data['files'] as List? ?? [])
-          .map((f) => ServerStackFileModel.fromJson(f))
-          .toList();
-      final subdirs = (data['subdirectories'] as List? ?? [])
-          .map((s) => {
-                'name': s['name']?.toString() ?? '',
-                'path': s['path']?.toString() ?? '',
-              })
-          .toList();
-      return {
-        'files': files,
-        'current_dir': data['current_dir'] ?? dir ?? '',
-        'parent_dir': data['parent_dir'] ?? '',
-        'subdirectories': subdirs,
-        'stacks_dir': data['stacks_dir'] ?? '',
-        'examples_dir': data['examples_dir'] ?? '',
-        'total': data['total'] ?? files.length,
-      };
-    }
-    throw Exception('Failed to fetch server stack files: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> fetchServerStackFiles({String? dir}) => ClusterApi.fetchServerStackFiles(dir: dir);
 
   /// Reads a Compose stack file from the Master server filesystem.
-  static Future<Map<String, dynamic>> fetchServerStackFile(String path) async {
-    final uri = Uri.parse('/api/stacks/server-file?path=${Uri.encodeQueryComponent(path)}');
-    final response = await http.get(uri, headers: authHeaders);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    throw Exception('Failed to read server stack file: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> fetchServerStackFile(String path) => ClusterApi.fetchServerStackFile(path);
 
   /// Deploys a stack directly from a Master server file path.
-  static Future<String?> deployServerStack(String path, {String? name, String? targetNode}) async {
-    final response = await http.post(
-      Uri.parse('/api/stacks/server-deploy'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'path': path,
-        if (name != null && name.isNotEmpty) 'name': name,
-        if (targetNode != null && targetNode.isNotEmpty) 'target_node': targetNode,
-      }),
-    );
-    if (response.statusCode == 200) {
-      return null;
-    }
-    try {
-      final body = jsonDecode(response.body);
-      return body['error'] ?? 'Unknown error';
-    } catch (_) {
-      return 'Server error: ${response.statusCode}';
-    }
-  }
+  static Future<String?> deployServerStack(String path, {String? name, String? targetNode}) => ClusterApi.deployServerStack(path, name: name, targetNode: targetNode);
 
   /// Saves or updates a Compose stack file directly on the Master server filesystem.
   static Future<Map<String, dynamic>> saveServerStackFile({
@@ -305,108 +118,28 @@ class ApiService {
     String? name,
     String? filename,
     String? dir,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/stacks/server-save'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'content': content,
-        if (name != null && name.isNotEmpty) 'name': name,
-        if (filename != null && filename.isNotEmpty) 'filename': filename,
-        if (dir != null && dir.isNotEmpty) 'dir': dir,
-      }),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    try {
-      final body = jsonDecode(response.body);
-      throw Exception(body['error'] ?? 'Server error ${response.statusCode}');
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Server error: ${response.statusCode}');
-    }
-  }
+  }) => ClusterApi.saveServerStackFile(content: content, name: name, filename: filename, dir: dir);
 
   /// Retrieves the list of built-in POC examples and blueprints.
-  static Future<List<POCExampleModel>> fetchPOCExamples() async {
-    final response = await http.get(Uri.parse('/api/examples'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['examples'] as List? ?? [])
-          .map((e) => POCExampleModel.fromJson(e))
-          .toList();
-    }
-    throw Exception('Failed to fetch POC examples: ${response.statusCode}');
-  }
+  static Future<List<POCExampleModel>> fetchPOCExamples() => ClusterApi.fetchPOCExamples();
 
   /// Deploys one or all POC examples into the cluster.
-  static Future<String?> deployPOCExample(String id, {String? targetNode}) async {
-    final response = await http.post(
-      Uri.parse('/api/examples/deploy'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'id': id,
-        if (targetNode != null && targetNode.isNotEmpty) 'target_node': targetNode,
-      }),
-    );
-    if (response.statusCode == 200) {
-      return null;
-    }
-    try {
-      final body = jsonDecode(response.body);
-      return body['error'] ?? 'Unknown error';
-    } catch (_) {
-      return 'Server error: ${response.statusCode}';
-    }
-  }
+  static Future<String?> deployPOCExample(String id, {String? targetNode}) => ClusterApi.deployPOCExample(id, targetNode: targetNode);
 
   /// Stops/removes a single task.
-  static Future<bool> deleteTask(String id) async {
-    final response = await http.delete(Uri.parse('/api/task/$id'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteTask(String id) => ClusterApi.deleteTask(id);
 
   /// Fetches container output logs or diagnostics for a given task ID.
-  static Future<String> getTaskLogs(String taskId) async {
-    try {
-      final response = await http.get(Uri.parse('/api/task/$taskId/logs'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['logs'] ?? '';
-      }
-      return 'Failed to load container logs (HTTP ${response.statusCode})';
-    } catch (e) {
-      return 'Error loading logs: $e';
-    }
-  }
+  static Future<String> getTaskLogs(String taskId) => ClusterApi.getTaskLogs(taskId);
 
   /// Migrates a stack to a target node.
-  static Future<bool> migrateStack(String stackId, String targetNode) async {
-    final response = await http.post(
-      Uri.parse('/api/stack/$stackId/migrate'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'target_node': targetNode}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> migrateStack(String stackId, String targetNode) => ClusterApi.migrateStack(stackId, targetNode);
 
   /// Provision and add a remote worker host via SSH.
-  static Future<String?> addHost(String host, String user, String password) async {
-    final res = await provisionNode(host: host, user: user, password: password);
-    return res.success ? null : res.error ?? res.message;
-  }
+  static Future<String?> addHost(String host, String user, String password) => ClusterApi.addHost(host, user, password);
 
   /// Fetches cluster join info and commands
-  static Future<NodeJoinInfo?> fetchJoinInfo() async {
-    try {
-      final response = await http.get(Uri.parse('/api/node/join-info'));
-      if (response.statusCode == 200) {
-        return NodeJoinInfo.fromJson(jsonDecode(response.body));
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<NodeJoinInfo?> fetchJoinInfo() => ClusterApi.fetchJoinInfo();
 
   /// Provision a remote host via SSH with step logs
   static Future<NodeProvisionResult> provisionNode({
@@ -417,239 +150,63 @@ class ApiService {
     String password = '',
     String privateKey = '',
     bool deploySystemStacks = true,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/node/add'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'host': host,
-          'port': port,
-          'user': user,
-          'auth_type': authType,
-          'password': password,
-          'private_key': privateKey,
-          'deploy_system_stacks': deploySystemStacks,
-        }),
-      );
-      final body = jsonDecode(response.body);
-      final rawLogs = (body['logs'] as List? ?? [])
-          .map((e) => ProvisionStepLog.fromJson(e))
-          .toList();
-      if (response.statusCode == 200 && (body['success'] == true || body['message'] != null)) {
-        return NodeProvisionResult(
-          success: true,
-          message: body['message'] ?? 'Node provisioned successfully',
-          logs: rawLogs,
-          node: body['node'] != null ? Node.fromJson(body['node']) : null,
-        );
-      } else {
-        return NodeProvisionResult(
-          success: false,
-          message: body['error'] ?? 'Provisioning failed',
-          error: body['error'] ?? 'Provisioning failed',
-          logs: rawLogs,
-        );
-      }
-    } catch (e) {
-      return NodeProvisionResult(
-        success: false,
-        message: e.toString(),
-        error: e.toString(),
-        logs: [
-          ProvisionStepLog(step: 'Connection Error', message: e.toString(), status: 'error'),
-        ],
-      );
-    }
-  }
+  }) => ClusterApi.provisionNode(host: host, port: port, user: user, authType: authType, password: password, privateKey: privateKey, deploySystemStacks: deploySystemStacks);
 
   /// Sends an action (pause, unpause, restart, start, stop) to a task
-  static Future<bool> taskAction(String id, String action) async {
-    final response = await http.post(
-      Uri.parse('/api/task/$id/action'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'action': action}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> taskAction(String id, String action) => ClusterApi.taskAction(id, action);
 
   /// Gets tail logs for a task
-  static Future<String> taskLogs(String id) async {
-    final response = await http.get(Uri.parse('/api/task/$id/logs'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['logs'] ?? '';
-    }
-    throw Exception('Failed to fetch logs: ${response.statusCode}');
-  }
+  static Future<String> taskLogs(String id) => ClusterApi.taskLogs(id);
 
   /// Gets inspect JSON for a task
-  static Future<String> taskInspect(String id) async {
-    final response = await http.get(Uri.parse('/api/task/$id/inspect'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return const JsonEncoder.withIndent('  ').convert(data);
-    }
-    throw Exception('Failed to fetch inspect data: ${response.statusCode}');
-  }
+  static Future<String> taskInspect(String id) => ClusterApi.taskInspect(id);
 
   /// Gets the compose YAML for a specific stack.
-  static Future<String> getStackCompose(String id) async {
-    final response = await http.get(Uri.parse('/api/stack/$id/compose'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['compose'] ?? '';
-    }
-    throw Exception('Failed to fetch compose');
-  }
+  static Future<String> getStackCompose(String id) => ClusterApi.getStackCompose(id);
 
   /// Saves updated compose YAML for a stack.
-  static Future<bool> updateStackCompose(String id, String compose) async {
-    final response = await http.put(
-      Uri.parse('/api/stack/$id/compose'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'compose': compose}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> updateStackCompose(String id, String compose) => ClusterApi.updateStackCompose(id, compose);
 
   /// Fetches user settings from the backend.
-  static Future<Map<String, dynamic>> getSettings() async {
-    final response = await http.get(Uri.parse('/api/settings'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {};
-  }
+  static Future<Map<String, dynamic>> getSettings() => ClusterApi.getSettings();
 
   /// Updates user settings on the backend.
-  static Future<bool> updateSettings(Map<String, dynamic> settings) async {
-    final response = await http.put(
-      Uri.parse('/api/settings'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(settings),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> updateSettings(Map<String, dynamic> settings) => ClusterApi.updateSettings(settings);
 
   /// Changes the web dashboard password.
   static Future<bool> changePassword(
-      String currentPassword, String newPassword) async {
-    final response = await http.put(
-      Uri.parse('/api/settings/password'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'current_password': currentPassword,
-        'new_password': newPassword,
-      }),
-    );
-    return response.statusCode == 200;
-  }
+      String currentPassword, String newPassword) => ClusterApi.changePassword(currentPassword, newPassword);
 
   /// Updates a node's role (promote/demote). Deprecated in single-manager architecture.
   @Deprecated('Deprecated in single-manager architecture')
-  static Future<bool> updateNodeRole(String id, String role) async {
-    final response = await http.post(
-      Uri.parse('/api/node/$id/role'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'role': role}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> updateNodeRole(String id, String role) => ClusterApi.updateNodeRole(id, role);
 
   /// Updates a node's availability status. Returns parsed response Map.
-  static Future<Map<String, dynamic>> updateNodeAvailability(String id, String availability) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/node/$id/availability'),
-        headers: authHeaders,
-        body: jsonEncode({'availability': availability}),
-      );
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      return {'error': 'Failed with status ${response.statusCode}'};
-    } catch (e) {
-      return {'error': e.toString()};
-    }
-  }
+  static Future<Map<String, dynamic>> updateNodeAvailability(String id, String availability) => ClusterApi.updateNodeAvailability(id, availability);
 
   /// Synchronizes the active authentication token to the remote worker node via SSH.
-  static Future<Map<String, dynamic>> syncNodeToken(String id) async {
-    try {
-      final response = await http.post(Uri.parse('/api/node/$id/sync-token'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      final body = jsonDecode(response.body);
-      return {'error': body['error'] ?? 'Failed to sync token'};
-    } catch (e) {
-      return {'error': e.toString()};
-    }
-  }
+  static Future<Map<String, dynamic>> syncNodeToken(String id) => ClusterApi.syncNodeToken(id);
 
   /// Commands the node to leave the cluster.
-  static Future<bool> leaveNode(String id) async {
-    final response = await http.post(Uri.parse('/api/node/$id/leave'));
-    return response.statusCode == 200;
-  }
+  static Future<bool> leaveNode(String id) => ClusterApi.leaveNode(id);
 
   /// Triggers a reboot for the node.
-  static Future<bool> rebootNode(String id) async {
-    final response = await http.post(Uri.parse('/api/node/$id/reboot'));
-    return response.statusCode == 200;
-  }
+  static Future<bool> rebootNode(String id) => ClusterApi.rebootNode(id);
 
   /// Updates a node's labels.
-  static Future<bool> updateNodeLabels(String id, Map<String, String> labels) async {
-    final response = await http.post(
-      Uri.parse('/api/node/$id/labels'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'labels': labels}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> updateNodeLabels(String id, Map<String, String> labels) => ClusterApi.updateNodeLabels(id, labels);
 
   /// Gets the CoreDNS configuration (Corefile).
-  static Future<String> getCoreDNSConfig() async {
-    final response = await http.get(Uri.parse('/api/coredns/config'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['config'] ?? '';
-    }
-    throw Exception('Failed to fetch CoreDNS config');
-  }
+  static Future<String> getCoreDNSConfig() => ClusterApi.getCoreDNSConfig();
 
   /// Updates the CoreDNS configuration (Corefile).
-  static Future<bool> updateCoreDNSConfig(String config) async {
-    final response = await http.put(
-      Uri.parse('/api/coredns/config'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'config': config}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> updateCoreDNSConfig(String config) => ClusterApi.updateCoreDNSConfig(config);
 
   /// Fetches CoreDNS status and memory usage.
-  static Future<CoreDNSStatusInfo> fetchCoreDNSStatusInfo() async {
-    final response = await http.get(Uri.parse('/api/coredns/status'));
-    if (response.statusCode == 200) {
-      return CoreDNSStatusInfo.fromJson(jsonDecode(response.body));
-    }
-    return CoreDNSStatusInfo(status: 'stopped', uptimeSeconds: 0, memBytes: 0, listeningPort: 5354, forwarders: [], totalRecords: 0);
-  }
+  static Future<CoreDNSStatusInfo> fetchCoreDNSStatusInfo() => ClusterApi.fetchCoreDNSStatusInfo();
 
   /// Fetches custom static DNS records.
-  static Future<List<CustomDNSRecord>> fetchCustomDNSRecords() async {
-    final response = await http.get(Uri.parse('/api/coredns/custom-records'));
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((e) => CustomDNSRecord.fromJson(e)).toList();
-      }
-    }
-    return [];
-  }
+  static Future<List<CustomDNSRecord>> fetchCustomDNSRecords() => ClusterApi.fetchCustomDNSRecords();
 
   /// Creates a custom static DNS record.
   static Future<bool> createCustomDNSRecord({
@@ -657,44 +214,16 @@ class ApiService {
     required String ip,
     String recordType = 'A',
     int ttl = 60,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/coredns/custom-records'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'domain': domain,
-        'ip': ip,
-        'record_type': recordType,
-        'ttl': ttl,
-      }),
-    );
-    return response.statusCode == 201;
-  }
+  }) => ClusterApi.createCustomDNSRecord(domain: domain, ip: ip, recordType: recordType, ttl: ttl);
 
   /// Deletes a custom static DNS record.
-  static Future<bool> deleteCustomDNSRecord(String id) async {
-    final response = await http.delete(Uri.parse('/api/coredns/custom-records/$id'));
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteCustomDNSRecord(String id) => ClusterApi.deleteCustomDNSRecord(id);
 
   /// Performs an interactive DNS query test (Dig / Nslookup).
   static Future<DNSDigResult> performDNSDig({
     required String domain,
     String recordType = 'A',
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/coredns/dig'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'domain': domain,
-        'record_type': recordType,
-      }),
-    );
-    if (response.statusCode == 200) {
-      return DNSDigResult.fromJson(jsonDecode(response.body));
-    }
-    return DNSDigResult(domain: domain, recordType: recordType, status: 'ERROR', queryTimeMs: 0.0, server: '127.0.0.1:5354', answers: [], rawOutput: 'Error connecting to server');
-  }
+  }) => ClusterApi.performDNSDig(domain: domain, recordType: recordType);
 
   /// Performs an HTTP/HTTPS curl resolution test from the manager against a domain/host.
   static Future<DNSCurlResult> performDNSCurl({
@@ -707,278 +236,62 @@ class ApiService {
     bool followRedirect = true,
     bool insecure = true,
     int timeoutSeconds = 5,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/coredns/curl'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'hostname': hostname,
-          'ip': ip,
-          'protocol': protocol,
-          'port': port,
-          'path': path,
-          'method': method,
-          'follow_redirect': followRedirect,
-          'insecure': insecure,
-          'timeout_seconds': timeoutSeconds,
-        }),
-      );
-      if (response.statusCode == 200) {
-        return DNSCurlResult.fromJson(jsonDecode(response.body));
-      }
-      return DNSCurlResult(
-        command: 'curl $protocol://$hostname$path',
-        statusCode: response.statusCode,
-        statusText: 'Server Error (${response.statusCode})',
-        latencyMs: 0.0,
-        headers: '',
-        body: response.body,
-        rawOutput: response.body,
-        targetIp: ip,
-        success: false,
-        error: 'HTTP ${response.statusCode}: ${response.body}',
-      );
-    } catch (e) {
-      return DNSCurlResult(
-        command: 'curl $protocol://$hostname$path',
-        statusCode: 0,
-        statusText: 'Request Failed',
-        latencyMs: 0.0,
-        headers: '',
-        body: e.toString(),
-        rawOutput: 'Network exception connecting to Gubernator API: $e',
-        targetIp: ip,
-        success: false,
-        error: e.toString(),
-      );
-    }
-  }
+  }) => ClusterApi.performDNSCurl(hostname: hostname, ip: ip, protocol: protocol, port: port, path: path, method: method, followRedirect: followRedirect, insecure: insecure, timeoutSeconds: timeoutSeconds);
 
   /// Performs an ICMP reachability / latency ping test against a domain or IP.
   static Future<DNSPingResult> performDNSPing({
     required String hostname,
     String ip = '',
     int count = 3,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/coredns/ping'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'hostname': hostname,
-          'ip': ip,
-          'count': count,
-        }),
-      );
-      if (response.statusCode == 200) {
-        return DNSPingResult.fromJson(jsonDecode(response.body));
-      }
-      return DNSPingResult(
-        command: 'ping -c $count ${ip.isNotEmpty ? ip : hostname}',
-        target: ip.isNotEmpty ? ip : hostname,
-        packetsSent: count,
-        packetsRecv: 0,
-        packetLoss: 100.0,
-        minLatency: 0.0,
-        avgLatency: 0.0,
-        maxLatency: 0.0,
-        rawOutput: response.body,
-        success: false,
-        error: 'HTTP ${response.statusCode}: ${response.body}',
-      );
-    } catch (e) {
-      return DNSPingResult(
-        command: 'ping -c $count ${ip.isNotEmpty ? ip : hostname}',
-        target: ip.isNotEmpty ? ip : hostname,
-        packetsSent: count,
-        packetsRecv: 0,
-        packetLoss: 100.0,
-        minLatency: 0.0,
-        avgLatency: 0.0,
-        maxLatency: 0.0,
-        rawOutput: 'Network exception connecting to Gubernator API: $e',
-        success: false,
-        error: e.toString(),
-      );
-    }
-  }
+  }) => ClusterApi.performDNSPing(hostname: hostname, ip: ip, count: count);
 
   /// Fetches the configured base cluster domain.
-  static Future<String> fetchClusterDomain() async {
-    try {
-      final response = await http.get(Uri.parse('/api/cluster/domain'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['cluster_domain'] ?? 'gbnt.local';
-      }
-    } catch (_) {}
-    return 'gbnt.local';
-  }
+  static Future<String> fetchClusterDomain() => ClusterApi.fetchClusterDomain();
 
   /// Updates the base cluster domain.
-  static Future<bool> updateClusterDomain(String domain) async {
-    final response = await http.put(
-      Uri.parse('/api/cluster/domain'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'cluster_domain': domain}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> updateClusterDomain(String domain) => ClusterApi.updateClusterDomain(domain);
 
   /// Fetches status of Weave Scope Network Topology superpower.
-  static Future<Map<String, dynamic>> fetchScopeStatus() async {
-    final response = await http.get(Uri.parse('/api/scope/status'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {'enabled': false, 'status': 'stopped'};
-  }
+  static Future<Map<String, dynamic>> fetchScopeStatus() => ClusterApi.fetchScopeStatus();
 
   /// Enables Weave Scope container.
-  static Future<bool> enableScope() async {
-    final response = await http.post(
-      Uri.parse('/api/scope/enable'),
-      headers: authHeaders,
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> enableScope() => ClusterApi.enableScope();
 
   /// Disables Weave Scope container.
-  static Future<bool> disableScope() async {
-    final response = await http.post(
-      Uri.parse('/api/scope/disable'),
-      headers: authHeaders,
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> disableScope() => ClusterApi.disableScope();
 
   /// Updates and pulls latest Weave Scope container image from Docker Hub.
-  static Future<Map<String, dynamic>> updateScopeImage() async {
-    final response = await http.post(
-      Uri.parse('/api/scope/update'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {'error': 'Failed to update Scope image'};
-  }
+  static Future<Map<String, dynamic>> updateScopeImage() => ClusterApi.updateScopeImage();
 
   /// Triggers cluster auto-update.
-  static Future<bool> applyUpdate(String targetVersion) async {
-    final response = await http.post(
-      Uri.parse('/api/update/apply'),
-      headers: authHeaders,
-      body: jsonEncode({'target_version': targetVersion}),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> applyUpdate(String targetVersion) => ClusterApi.applyUpdate(targetVersion);
 
   /// Fetches latest release check from backend /api/system/update/check with optional force refresh.
-  static Future<Map<String, dynamic>> fetchUpdateCheck({bool force = false}) async {
-    try {
-      final url = force ? '/api/update/check?force=true' : '/api/update/check';
-      final response = await http.get(Uri.parse(url), headers: authHeaders);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-    } catch (_) {}
-    return {'update_available': false, 'latest_version': 'unknown'};
-  }
+  static Future<Map<String, dynamic>> fetchUpdateCheck({bool force = false}) => ClusterApi.fetchUpdateCheck(force: force);
 
   /// Fetches live status of an ongoing or recent update.
-  static Future<Map<String, dynamic>> fetchUpdateStatus() async {
-    try {
-      final response = await http.get(Uri.parse('/api/update/status'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-    } catch (_) {}
-    return {'status': 'unknown'};
-  }
+  static Future<Map<String, dynamic>> fetchUpdateStatus() => ClusterApi.fetchUpdateStatus();
 
   /// Fetches active SLO definitions and error budgets.
-  static Future<List<SLOItem>> fetchSLOs() async {
-    final response = await http.get(Uri.parse('/api/slo'));
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((e) => SLOItem.fromJson(e as Map<String, dynamic>)).toList();
-      }
-    }
-    return [];
-  }
+  static Future<List<SLOItem>> fetchSLOs() => ObservabilityWafApi.fetchSLOs();
 
   /// Force syncs SLO rules with Prometheus.
-  static Future<bool> syncSLOs() async {
-    final response = await http.post(Uri.parse('/api/slo/sync'));
-    return response.statusCode == 200;
-  }
+  static Future<bool> syncSLOs() => ObservabilityWafApi.syncSLOs();
 
   /// Fetches aggregated User Journeys.
-  static Future<List<UserJourney>> fetchUserJourneys() async {
-    final response = await http.get(Uri.parse('/api/slo/journeys'));
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((e) => UserJourney.fromJson(e as Map<String, dynamic>)).toList();
-      }
-    }
-    return [];
-  }
+  static Future<List<UserJourney>> fetchUserJourneys() => ObservabilityWafApi.fetchUserJourneys();
 
   /// Fetches deployment events correlation.
-  static Future<List<SLOCorrelationEvent>> fetchSLOCorrelations() async {
-    final response = await http.get(Uri.parse('/api/slo/correlation'));
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((e) => SLOCorrelationEvent.fromJson(e as Map<String, dynamic>)).toList();
-      }
-    }
-    return [];
-  }
+  static Future<List<SLOCorrelationEvent>> fetchSLOCorrelations() => ObservabilityWafApi.fetchSLOCorrelations();
 
   /// Validates Compose YAML and runs PromQL backtest.
-  static Future<List<SLOValidationItem>> validateSLO(String composeRaw) async {
-    final response = await http.post(
-      Uri.parse('/api/slo/validate'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'compose_raw': composeRaw}),
-    );
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((e) => SLOValidationItem.fromJson(e as Map<String, dynamic>)).toList();
-      }
-    }
-    return [];
-  }
+  static Future<List<SLOValidationItem>> validateSLO(String composeRaw) => ObservabilityWafApi.validateSLO(composeRaw);
 
   /// Fetches historical trend points for an SLO.
-  static Future<List<SLOHistoryPoint>> fetchSLOHistory(String serviceId, String timeRange) async {
-    final response = await http.get(Uri.parse('/api/slo/history?service_id=$serviceId&range=$timeRange'));
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((e) => SLOHistoryPoint.fromJson(e as Map<String, dynamic>)).toList();
-      }
-    }
-    return [];
-  }
+  static Future<List<SLOHistoryPoint>> fetchSLOHistory(String serviceId, String timeRange) => ObservabilityWafApi.fetchSLOHistory(serviceId, timeRange);
 
   /// Fetches RED metrics for a service.
-  static Future<SLOREDMetrics> fetchSLOREDMetrics(String serviceId) async {
-    final response = await http.get(Uri.parse('/api/slo/red?service_id=$serviceId'));
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map<String, dynamic>) {
-        return SLOREDMetrics.fromJson(decoded);
-      }
-    }
-    return SLOREDMetrics(rps: 0, errorRps: 0, p99LatencyMs: 0);
-  }
+  static Future<SLOREDMetrics> fetchSLOREDMetrics(String serviceId) => ObservabilityWafApi.fetchSLOREDMetrics(serviceId);
 
   /// Creates or updates an SLO configuration for a service.
   static Future<bool> editSLO({
@@ -992,156 +305,46 @@ class ApiService {
     String journey = '',
     String errorQuery = '',
     String totalQuery = '',
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/slo/edit'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'service_id': serviceId,
-        'enable': enable,
-        'target': target,
-        'window': window,
-        'indicator': indicator,
-        'latency_threshold': latencyThreshold,
-        'template': template,
-        'journey': journey,
-        'error_query': errorQuery,
-        'total_query': totalQuery,
-      }),
-    );
-    return response.statusCode == 200;
-  }
+  }) => ObservabilityWafApi.editSLO(serviceId: serviceId, enable: enable, target: target, window: window, indicator: indicator, latencyThreshold: latencyThreshold, template: template, journey: journey, errorQuery: errorQuery, totalQuery: totalQuery);
 
   /// Disables/deletes an SLO configuration for a service.
-  static Future<bool> deleteSLO(String serviceId) async {
-    final response = await http.delete(Uri.parse('/api/slo/$serviceId'));
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteSLO(String serviceId) => ObservabilityWafApi.deleteSLO(serviceId);
 
   /// Fetches SLO notification configuration (Email, Webhook).
-  static Future<Map<String, dynamic>> fetchSLONotifyConfig() async {
-    final response = await http.get(Uri.parse('/api/slo/notify/config'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    return {};
-  }
+  static Future<Map<String, dynamic>> fetchSLONotifyConfig() => ObservabilityWafApi.fetchSLONotifyConfig();
 
   /// Saves SLO notification configuration (Email, Webhook).
-  static Future<bool> saveSLONotifyConfig(Map<String, dynamic> config) async {
-    final response = await http.post(
-      Uri.parse('/api/slo/notify/config'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(config),
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> saveSLONotifyConfig(Map<String, dynamic> config) => ObservabilityWafApi.saveSLONotifyConfig(config);
 
   /// Dispatches a test SLO alert notification (email or webhook).
-  static Future<Map<String, dynamic>> testSLONotify(String channel) async {
-    final response = await http.post(
-      Uri.parse('/api/slo/notify/test'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'channel': channel}),
-    );
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
+  static Future<Map<String, dynamic>> testSLONotify(String channel) => ObservabilityWafApi.testSLONotify(channel);
 
   /// Fetches all deployed services from state.
-  static Future<List<Service>> fetchServices() async {
-    final state = await fetchState();
-    return state.services;
-  }
+  static Future<List<Service>> fetchServices() => ObservabilityWafApi.fetchServices();
 
   /// Caddy: Fetches Caddy status and stats for a given node.
-  static Future<Map<String, dynamic>> fetchCaddyStatus({String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/status${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {};
-  }
+  static Future<Map<String, dynamic>> fetchCaddyStatus({String? nodeId}) => ObservabilityWafApi.fetchCaddyStatus(nodeId: nodeId);
 
   /// Caddy: Fetches dynamic routes matrix.
-  static Future<List<dynamic>> fetchCaddyRoutes({String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/routes${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['routes'] ?? [];
-    }
-    return [];
-  }
+  static Future<List<dynamic>> fetchCaddyRoutes({String? nodeId}) => ObservabilityWafApi.fetchCaddyRoutes(nodeId: nodeId);
 
   /// Caddy: Fetches TLS certs list.
-  static Future<List<dynamic>> fetchCaddyCerts({String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/certs${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['certificates'] ?? [];
-    }
-    return [];
-  }
+  static Future<List<dynamic>> fetchCaddyCerts({String? nodeId}) => ObservabilityWafApi.fetchCaddyCerts(nodeId: nodeId);
 
   /// Caddy: Fetches tail logs.
-  static Future<List<String>> fetchCaddyLogs({String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/logs${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final List raw = data['logs'] ?? [];
-      return raw.map((e) => e.toString()).toList();
-    }
-    return [];
-  }
+  static Future<List<String>> fetchCaddyLogs({String? nodeId}) => ObservabilityWafApi.fetchCaddyLogs(nodeId: nodeId);
 
   /// Caddy: Fetches Prometheus metrics.
-  static Future<Map<String, dynamic>> fetchCaddyMetrics({String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/metrics${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {};
-  }
+  static Future<Map<String, dynamic>> fetchCaddyMetrics({String? nodeId}) => ObservabilityWafApi.fetchCaddyMetrics(nodeId: nodeId);
 
   /// Caddy: Formats Caddyfile content via caddy fmt.
-  static Future<String> formatCaddyfile(String caddyfile) async {
-    final response = await http.post(
-      Uri.parse('/api/caddy/fmt'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'caddyfile': caddyfile}),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['formatted'] ?? caddyfile;
-    }
-    return caddyfile;
-  }
+  static Future<String> formatCaddyfile(String caddyfile) => ObservabilityWafApi.formatCaddyfile(caddyfile);
 
   /// Caddy: Inspects full X.509 certificate details for a domain.
-  static Future<Map<String, dynamic>?> inspectCaddyCert(String domain, {String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/certs/inspect?domain=${Uri.encodeComponent(domain)}${nodeId != null ? '&node_id=$nodeId' : ''}');
-    final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['certificate'];
-    }
-    return null;
-  }
+  static Future<Map<String, dynamic>?> inspectCaddyCert(String domain, {String? nodeId}) => ObservabilityWafApi.inspectCaddyCert(domain, nodeId: nodeId);
 
   /// Caddy: Forces certificate renewal/rotation for a domain.
-  static Future<Map<String, dynamic>> renewCaddyCert(String domain, {String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/certs/renew${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'domain': domain}),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> renewCaddyCert(String domain, {String? nodeId}) => ObservabilityWafApi.renewCaddyCert(domain, nodeId: nodeId);
 
   /// Caddy: Installs a custom TLS certificate and private key.
   static Future<Map<String, dynamic>> uploadCustomCaddyCert(
@@ -1149,248 +352,62 @@ class ApiService {
     String certPem,
     String keyPem, {
     String? nodeId,
-  }) async {
-    final uri = Uri.parse('/api/caddy/certs/custom${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'domain': domain,
-        'cert_pem': certPem,
-        'key_pem': keyPem,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
+  }) => ObservabilityWafApi.uploadCustomCaddyCert(domain, certPem, keyPem, nodeId: nodeId);
 
   /// Caddy: Prunes orphaned certificates no longer referenced in Caddyfile.
-  static Future<Map<String, dynamic>> pruneOrphanedCaddyCerts({String? nodeId}) async {
-    final uri = Uri.parse('/api/caddy/certs/orphaned${nodeId != null ? '?node_id=$nodeId' : ''}');
-    final response = await http.delete(uri);
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> pruneOrphanedCaddyCerts({String? nodeId}) => ObservabilityWafApi.pruneOrphanedCaddyCerts(nodeId: nodeId);
 
   /// Caddy: Synchronizes all TLS certificates across all active cluster nodes.
-  static Future<Map<String, dynamic>> syncCaddyCerts() async {
-    final response = await http.post(Uri.parse('/api/caddy/certs/sync'), headers: authHeaders);
-    return jsonDecode(response.body);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Caddy Ingress WAF & Threat Shield APIs (v2.94.0)
-  // ─────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> syncCaddyCerts() => ObservabilityWafApi.syncCaddyCerts();
 
   /// WAF: Fetches global Threat Shield configuration.
-  static Future<Map<String, dynamic>> fetchWAFConfig() async {
-    final response = await http.get(Uri.parse('/api/caddy/waf/config'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {};
-  }
+  static Future<Map<String, dynamic>> fetchWAFConfig() => ObservabilityWafApi.fetchWAFConfig();
 
   /// WAF: Updates global Threat Shield configuration.
-  static Future<Map<String, dynamic>> updateWAFConfig(Map<String, dynamic> config) async {
-    final response = await http.post(
-      Uri.parse('/api/caddy/waf/config'),
-      headers: authHeaders,
-      body: jsonEncode(config),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> updateWAFConfig(Map<String, dynamic> config) => ObservabilityWafApi.updateWAFConfig(config);
 
   /// WAF: Fetches cluster-wide Threat Shield aggregate statistics.
-  static Future<Map<String, dynamic>> fetchWAFStats() async {
-    final response = await http.get(Uri.parse('/api/caddy/waf/stats'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    return {};
-  }
+  static Future<Map<String, dynamic>> fetchWAFStats() => ObservabilityWafApi.fetchWAFStats();
 
   /// WAF: Fetches per-route WAF rules and overrides.
-  static Future<List<dynamic>> fetchWAFRoutes() async {
-    final response = await http.get(Uri.parse('/api/caddy/waf/routes'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['routes'] ?? [];
-    }
-    return [];
-  }
+  static Future<List<dynamic>> fetchWAFRoutes() => ObservabilityWafApi.fetchWAFRoutes();
 
   /// WAF: Toggles WAF state and mode for a specific ingress route ("A Mano").
-  static Future<Map<String, dynamic>> toggleRouteWAF(String host, bool enabled, String mode) async {
-    final response = await http.post(
-      Uri.parse('/api/caddy/waf/routes/toggle'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'host': host,
-        'enabled': enabled,
-        'mode': mode,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> toggleRouteWAF(String host, bool enabled, String mode) => ObservabilityWafApi.toggleRouteWAF(host, enabled, mode);
 
   /// WAF: Clears manual route override, restoring cluster default.
-  static Future<Map<String, dynamic>> deleteRouteWAF(String host) async {
-    final response = await http.delete(
-      Uri.parse('/api/caddy/waf/routes/${Uri.encodeComponent(host)}'),
-      headers: authHeaders,
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> deleteRouteWAF(String host) => ObservabilityWafApi.deleteRouteWAF(host);
 
   /// WAF: Fetches intercepted security threat events.
-  static Future<List<dynamic>> fetchWAFEvents({int limit = 50, String? type, String? host}) async {
-    var url = '/api/caddy/waf/events?limit=$limit';
-    if (type != null && type.isNotEmpty && type != 'ALL') {
-      url += '&type=${Uri.encodeComponent(type)}';
-    }
-    if (host != null && host.isNotEmpty && host != 'ALL') {
-      url += '&host=${Uri.encodeComponent(host)}';
-    }
-    final response = await http.get(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['events'] ?? [];
-    }
-    return [];
-  }
+  static Future<List<dynamic>> fetchWAFEvents({int limit = 50, String? type, String? host}) => ObservabilityWafApi.fetchWAFEvents(limit: limit, type: type, host: host);
 
   /// WAF: Adds an IP or CIDR to the Threat Shield blacklist.
-  static Future<Map<String, dynamic>> blockWAFIP(String ip, String reason) async {
-    final response = await http.post(
-      Uri.parse('/api/caddy/waf/ip/block'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'ip': ip,
-        'reason': reason,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> blockWAFIP(String ip, String reason) => ObservabilityWafApi.blockWAFIP(ip, reason);
 
   /// WAF: Removes an IP or CIDR from the Threat Shield blacklist.
-  static Future<Map<String, dynamic>> unblockWAFIP(String ip) async {
-    final response = await http.post(
-      Uri.parse('/api/caddy/waf/ip/unblock'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'ip': ip,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> unblockWAFIP(String ip) => ObservabilityWafApi.unblockWAFIP(ip);
 
   /// WAF: Simulates a penetration test probe through Threat Shield.
-  static Future<Map<String, dynamic>> simulateWAFThreat(String host, String vector) async {
-    final response = await http.post(
-      Uri.parse('/api/caddy/waf/test'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'host': host,
-        'vector': vector,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Enterprise Authentication & Active Directory / LDAP APIs
-  // ─────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> simulateWAFThreat(String host, String vector) => ObservabilityWafApi.simulateWAFThreat(host, vector);
 
   /// Fetches available identity providers (Local Admin + Active Directory/LDAP).
-  static Future<List<AuthProvider>> fetchAuthProviders() async {
-    final response = await http.get(Uri.parse('/api/auth/providers'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['providers'] as List? ?? [])
-          .map((e) => AuthProvider.fromJson(e))
-          .toList();
-    }
-    return [const AuthProvider(id: 'local', name: 'Local Administrator', type: 'local')];
-  }
+  static Future<List<AuthProvider>> fetchAuthProviders() => AuthSecurityApi.fetchAuthProviders();
 
   /// Logs in against Local Admin or an Active Directory/LDAP provider.
   static Future<Map<String, dynamic>> login(
     String username,
     String password, {
     String? provider,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'password': password,
-        'provider': provider ?? 'local',
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      if (data['mfa_required'] == true) {
-        return {
-          'success': true,
-          'mfa_required': true,
-          'mfa_token': data['mfa_token'],
-          'username': data['username'],
-          'mfa_configured': data['mfa_configured'] ?? true,
-          'secret': data['secret'],
-          'otpauth_uri': data['otpauth_uri'],
-          'qr_data_uri': data['qr_data_uri'],
-          'backup_codes': (data['backup_codes'] as List?)?.map((e) => e.toString()).toList(),
-        };
-      }
-      if (data['token'] != null) {
-        authToken = data['token'];
-        return {'success': true, 'user': UserSession.fromJson(data['user'])};
-      }
-    }
-    return {'success': false, 'error': data['error'] ?? 'Login failed (${response.statusCode})'};
-  }
+  }) => AuthSecurityApi.login(username, password, provider: provider);
 
   /// Sends a client time beacon to the server to detect and correct VM sleep clock drift.
-  static Future<Map<String, dynamic>?> sendTimeBeacon() async {
-    try {
-      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      final response = await http.post(
-        Uri.parse('/api/system/time-beacon'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'client_timestamp': nowSec}),
-      ).timeout(const Duration(seconds: 3));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<Map<String, dynamic>?> sendTimeBeacon() => AuthSecurityApi.sendTimeBeacon();
 
   /// Completes MFA login verification using TOTP 6-digit code or recovery code.
   static Future<Map<String, dynamic>> verifyMFA({
     required String mfaToken,
     required String code,
-  }) async {
-    final cleanCode = code.trim().replaceAll(' ', '').replaceAll('-', '');
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final response = await http.post(
-      Uri.parse('/api/auth/mfa/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'mfa_token': mfaToken,
-        'code': cleanCode,
-        'client_timestamp': nowSec,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['token'] != null) {
-      authToken = data['token'];
-      return {'success': true, 'user': UserSession.fromJson(data['user'])};
-    }
-    return {'success': false, 'error': data['error'] ?? 'MFA verification failed (${response.statusCode})'};
-  }
+  }) => AuthSecurityApi.verifyMFA(mfaToken: mfaToken, code: code);
 
   /// Completes initial MFA setup during login when MFA is enforced (ENS op.acc.6)
   static Future<Map<String, dynamic>> completeEnforcedMFASetup({
@@ -1398,44 +415,10 @@ class ApiService {
     required String secret,
     required String code,
     List<String>? backupCodes,
-  }) async {
-    final cleanCode = code.trim().replaceAll(' ', '').replaceAll('-', '');
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final response = await http.post(
-      Uri.parse('/api/auth/mfa/setup-complete'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'mfa_token': mfaToken,
-        'secret': secret.trim().replaceAll(' ', '').replaceAll('-', ''),
-        'code': cleanCode,
-        'backup_codes': backupCodes ?? [],
-        'client_timestamp': nowSec,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 && data['token'] != null) {
-      authToken = data['token'];
-      return {'success': true, 'user': UserSession.fromJson(data['user'])};
-    }
-    return {'success': false, 'error': data['error'] ?? 'MFA mandatory setup failed (${response.statusCode})'};
-  }
+  }) => AuthSecurityApi.completeEnforcedMFASetup(mfaToken: mfaToken, secret: secret, code: code, backupCodes: backupCodes);
 
   /// Initiates MFA setup for current user or admin target user.
-  static Future<Map<String, dynamic>> setupMFA({String? userId}) async {
-    final response = await http.post(
-      Uri.parse('/api/auth/mfa/setup'),
-      headers: authHeaders,
-      body: jsonEncode({
-        if (userId != null && userId.isNotEmpty) 'user_id': userId,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      return data;
-    }
-    throw Exception(data['error'] ?? 'Failed to setup MFA');
-  }
+  static Future<Map<String, dynamic>> setupMFA({String? userId}) => AuthSecurityApi.setupMFA(userId: userId);
 
   /// Confirms and enables MFA with the first generated TOTP code.
   static Future<Map<String, dynamic>> enableMFA({
@@ -1443,230 +426,57 @@ class ApiService {
     required String secret,
     required String code,
     List<String>? backupCodes,
-  }) async {
-    final cleanCode = code.trim().replaceAll(' ', '').replaceAll('-', '');
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final response = await http.post(
-      Uri.parse('/api/auth/mfa/enable'),
-      headers: authHeaders,
-      body: jsonEncode({
-        if (userId != null && userId.isNotEmpty) 'user_id': userId,
-        'secret': secret.trim().replaceAll(' ', '').replaceAll('-', ''),
-        'code': cleanCode,
-        'backup_codes': backupCodes ?? [],
-        'client_timestamp': nowSec,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      return data;
-    }
-    return {'error': data['error'] ?? 'Failed to activate MFA'};
-  }
+  }) => AuthSecurityApi.enableMFA(userId: userId, secret: secret, code: code, backupCodes: backupCodes);
 
   /// Disables MFA for user.
   static Future<Map<String, dynamic>> disableMFA({
     String? userId,
     String? code,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/auth/mfa/disable'),
-      headers: authHeaders,
-      body: jsonEncode({
-        if (userId != null && userId.isNotEmpty) 'user_id': userId,
-        if (code != null && code.isNotEmpty) 'code': code.trim(),
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      return data;
-    }
-    return {'error': data['error'] ?? 'Failed to disable MFA'};
-  }
+  }) => AuthSecurityApi.disableMFA(userId: userId, code: code);
 
   /// Fetches the currently authenticated user profile and permissions.
-  static Future<UserSession?> fetchMe() async {
-    try {
-      final response = await http.get(Uri.parse('/api/auth/me'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return UserSession.fromJson(data['user']);
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<UserSession?> fetchMe() => AuthSecurityApi.fetchMe();
 
   /// Logs out the user and clears stored session tokens.
-  static Future<void> logout({String? reason}) async {
-    try {
-      final body = reason != null ? jsonEncode({'reason': reason}) : null;
-      await http.post(Uri.parse('/api/auth/logout'), headers: authHeaders, body: body);
-    } catch (_) {}
-    authToken = null;
-  }
+  static Future<void> logout({String? reason}) => AuthSecurityApi.logout(reason: reason);
 
   /// Fetches all configured LDAP / Active Directory servers (Admin only).
-  static Future<List<LDAPConfig>> fetchLDAPConfigs() async {
-    final response = await http.get(Uri.parse('/api/auth/ldap'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['configs'] as List? ?? [])
-          .map((e) => LDAPConfig.fromJson(e))
-          .toList();
-    }
-    return [];
-  }
+  static Future<List<LDAPConfig>> fetchLDAPConfigs() => AuthSecurityApi.fetchLDAPConfigs();
 
   /// Creates or updates an LDAP / Active Directory configuration.
-  static Future<Map<String, dynamic>> saveLDAPConfig(LDAPConfig config) async {
-    final response = await http.post(
-      Uri.parse('/api/auth/ldap'),
-      headers: authHeaders,
-      body: jsonEncode(config.toJson()),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> saveLDAPConfig(LDAPConfig config) => AuthSecurityApi.saveLDAPConfig(config);
 
   /// Deletes an LDAP / Active Directory configuration.
-  static Future<bool> deleteLDAPConfig(String id) async {
-    final response = await http.delete(Uri.parse('/api/auth/ldap/$id'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteLDAPConfig(String id) => AuthSecurityApi.deleteLDAPConfig(id);
 
   /// Tests connectivity and optional user credentials against an LDAP configuration.
   static Future<LDAPTestResult> testLDAPConfig(
     LDAPConfig config, {
     String testUsername = '',
     String testPassword = '',
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/auth/ldap/test'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'config': config.toJson(),
-        'test_username': testUsername,
-        'test_password': testPassword,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-    if (data['result'] != null) {
-      return LDAPTestResult.fromJson(data['result']);
-    }
-    return LDAPTestResult(
-      connected: false,
-      tlsActive: false,
-      bindSuccessful: false,
-      userFound: false,
-      message: data['error'] ?? 'Connection test failed',
-      latencyMs: 0,
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // OIDC / OAuth2 SSO APIs
-  // ─────────────────────────────────────────────────────────────────────────
+  }) => AuthSecurityApi.testLDAPConfig(config, testUsername: testUsername, testPassword: testPassword);
 
   /// Fetches all configured OIDC / SSO providers (Admin only).
-  static Future<List<OIDCConfig>> fetchOIDCConfigs() async {
-    try {
-      final response = await http.get(Uri.parse('/api/auth/oidc'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return (data['configs'] as List? ?? [])
-            .map((e) => OIDCConfig.fromJson(e))
-            .toList();
-      }
-    } catch (_) {}
-    return [];
-  }
+  static Future<List<OIDCConfig>> fetchOIDCConfigs() => AuthSecurityApi.fetchOIDCConfigs();
 
   /// Fetches built-in OIDC provider presets (Keycloak, Google, Azure, etc.).
-  static Future<List<OIDCProviderPreset>> fetchOIDCPresets() async {
-    try {
-      final response = await http.get(Uri.parse('/api/auth/oidc/presets'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return (data['presets'] as List? ?? [])
-            .map((e) => OIDCProviderPreset.fromJson(e))
-            .toList();
-      }
-    } catch (_) {}
-    return [];
-  }
+  static Future<List<OIDCProviderPreset>> fetchOIDCPresets() => AuthSecurityApi.fetchOIDCPresets();
 
   /// Creates or updates an OIDC provider configuration.
-  static Future<Map<String, dynamic>> saveOIDCConfig(OIDCConfig config) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/auth/oidc'),
-        headers: authHeaders,
-        body: jsonEncode(config.toJson()),
-      );
-      return jsonDecode(response.body);
-    } catch (e) {
-      return {'error': e.toString()};
-    }
-  }
+  static Future<Map<String, dynamic>> saveOIDCConfig(OIDCConfig config) => AuthSecurityApi.saveOIDCConfig(config);
 
   /// Deletes an OIDC provider configuration.
-  static Future<bool> deleteOIDCConfig(String id) async {
-    try {
-      final response = await http.delete(Uri.parse('/api/auth/oidc/$id'), headers: authHeaders);
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
+  static Future<bool> deleteOIDCConfig(String id) => AuthSecurityApi.deleteOIDCConfig(id);
 
   /// Tests connectivity to an OIDC provider's discovery endpoint and JWKS.
-  static Future<OIDCTestResult> testOIDCConfig(OIDCConfig config) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/auth/oidc/${config.id}/test'),
-        headers: authHeaders,
-        body: jsonEncode(config.toJson()),
-      );
-      final data = jsonDecode(response.body);
-      return OIDCTestResult.fromJson(data);
-    } catch (e) {
-      return OIDCTestResult(
-        connected: false,
-        issuerReachable: false,
-        discoveryOk: false,
-        jwksReachable: false,
-        message: e.toString(),
-      );
-    }
-  }
+  static Future<OIDCTestResult> testOIDCConfig(OIDCConfig config) => AuthSecurityApi.testOIDCConfig(config);
 
   /// Requests an OAuth2 authorization URL to begin the SSO login flow.
   /// Returns the auth_url to open in the browser and the state token.
-  static Future<Map<String, dynamic>> getOIDCAuthorizeUrl(String providerId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/auth/oidc/$providerId/authorize'),
-      );
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return {'error': 'Failed to get authorization URL (${response.statusCode})'};
-    } catch (e) {
-      return {'error': e.toString()};
-    }
-  }
+  static Future<Map<String, dynamic>> getOIDCAuthorizeUrl(String providerId) => AuthSecurityApi.getOIDCAuthorizeUrl(providerId);
 
   /// Fetches all local user accounts.
-  static Future<List<LocalUser>> fetchLocalUsers() async {
-    final response = await http.get(Uri.parse("/api/security/users"), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data["users"] as List? ?? [])
-          .map((e) => LocalUser.fromJson(e))
-          .toList();
-    }
-    return [];
-  }
+  static Future<List<LocalUser>> fetchLocalUsers() => AuthSecurityApi.fetchLocalUsers();
 
   /// Creates a new local user.
   static Future<Map<String, dynamic>> createLocalUser({
@@ -1676,243 +486,49 @@ class ApiService {
     required String email,
     required String role,
     required bool enabled,
-  }) async {
-    final response = await http.post(
-      Uri.parse("/api/security/users"),
-      headers: authHeaders,
-      body: jsonEncode({
-        "username": username,
-        "password": password,
-        "display_name": displayName,
-        "email": email,
-        "role": role,
-        "enabled": enabled,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
+  }) => AuthSecurityApi.createLocalUser(username: username, password: password, displayName: displayName, email: email, role: role, enabled: enabled);
 
   /// Updates an existing local user.
-  static Future<Map<String, dynamic>> updateLocalUser(LocalUser user) async {
-    final response = await http.put(
-      Uri.parse("/api/security/users/${user.id}"),
-      headers: authHeaders,
-      body: jsonEncode(user.toJson()),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> updateLocalUser(LocalUser user) => AuthSecurityApi.updateLocalUser(user);
 
   /// Toggles suspension status of a local user account.
-  static Future<Map<String, dynamic>> toggleLocalUserStatus(String id, {bool? enabled}) async {
-    final body = enabled != null ? jsonEncode({"enabled": enabled}) : "{}";
-    final response = await http.post(
-      Uri.parse("/api/security/users/$id/toggle-status"),
-      headers: authHeaders,
-      body: body,
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> toggleLocalUserStatus(String id, {bool? enabled}) => AuthSecurityApi.toggleLocalUserStatus(id, enabled: enabled);
 
   /// Resets a local user password.
-  static Future<Map<String, dynamic>> resetLocalUserPassword(String id, String newPassword) async {
-    final response = await http.post(
-      Uri.parse("/api/security/users/$id/password"),
-      headers: authHeaders,
-      body: jsonEncode({"new_password": newPassword}),
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> resetLocalUserPassword(String id, String newPassword) => AuthSecurityApi.resetLocalUserPassword(id, newPassword);
 
   /// Administratively unlocks a locked local user account (ENS op.acc.2).
-  static Future<Map<String, dynamic>> unlockLocalUser(String id) async {
-    final response = await http.post(
-      Uri.parse("/api/security/users/$id/unlock"),
-      headers: authHeaders,
-    );
-    return jsonDecode(response.body);
-  }
+  static Future<Map<String, dynamic>> unlockLocalUser(String id) => AuthSecurityApi.unlockLocalUser(id);
 
   /// Deletes a local user account.
-  static Future<bool> deleteLocalUser(String id) async {
-    final response = await http.delete(Uri.parse("/api/security/users/$id"), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteLocalUser(String id) => AuthSecurityApi.deleteLocalUser(id);
 
   /// Fetches access and audit logs.
-  static Future<List<AuditLog>> fetchAuditLogs({String provider = "", String action = ""}) async {
-    var url = "/api/security/audit-logs";
-    List<String> queryParams = [];
-    if (provider.isNotEmpty) queryParams.add("provider=$provider");
-    if (action.isNotEmpty) queryParams.add("action=$action");
-    if (queryParams.isNotEmpty) {
-      url += "?${queryParams.join("&")}";
-    }
-    final response = await http.get(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data["audit_logs"] as List? ?? [])
-          .map((e) => AuditLog.fromJson(e))
-          .toList();
-    }
-    return [];
-  }
+  static Future<List<AuditLog>> fetchAuditLogs({String provider = "", String action = ""}) => AuthSecurityApi.fetchAuditLogs(provider: provider, action: action);
 
   /// Fetches cluster SIEM and ENS security configuration.
-  static Future<SIEMConfig?> fetchSIEMConfig() async {
-    try {
-      final response = await http.get(Uri.parse('/api/security/siem'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return SIEMConfig.fromJson(data);
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<SIEMConfig?> fetchSIEMConfig() => AuthSecurityApi.fetchSIEMConfig();
 
   /// Fetches cluster SIEM delivery metrics, connection health, and ENS compliance status.
-  static Future<SIEMStatusResponse?> fetchSIEMStatus() async {
-    try {
-      final response = await http.get(Uri.parse('/api/security/siem/status'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return SIEMStatusResponse.fromJson(data);
-      }
-    } catch (_) {}
-    return null;
-  }
+  static Future<SIEMStatusResponse?> fetchSIEMStatus() => AuthSecurityApi.fetchSIEMStatus();
 
   /// Saves cluster SIEM and ENS security configuration.
-  static Future<Map<String, dynamic>> saveSIEMConfig(SIEMConfig config) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/security/siem'),
-        headers: authHeaders,
-        body: jsonEncode(config.toJson()),
-      );
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        if (data is Map<String, dynamic>) {
-          if (!data.containsKey('success')) {
-            data['success'] = true;
-          }
-          return data;
-        }
-        return {'success': true};
-      }
-      try {
-        final err = jsonDecode(response.body);
-        if (err is Map<String, dynamic>) {
-          return {
-            'success': false,
-            'error': err['error'] ?? err['message'] ?? 'Error HTTP ${response.statusCode}',
-          };
-        }
-      } catch (_) {}
-      return {'success': false, 'error': 'Error HTTP ${response.statusCode}'};
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
-    }
-  }
+  static Future<Map<String, dynamic>> saveSIEMConfig(SIEMConfig config) => AuthSecurityApi.saveSIEMConfig(config);
 
   /// Sends a live SIEM test syslog/CEF probe.
-  static Future<Map<String, dynamic>> testSIEMConnection(SIEMConfig config) async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/security/siem/test'),
-        headers: authHeaders,
-        body: jsonEncode(config.toJson()),
-      );
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        if (data is Map<String, dynamic>) {
-          if (!data.containsKey('success')) {
-            data['success'] = true;
-          }
-          return data;
-        }
-        return {'success': true};
-      }
-      try {
-        final err = jsonDecode(response.body);
-        if (err is Map<String, dynamic>) {
-          return {
-            'success': false,
-            'error': err['error'] ?? err['message'] ?? 'Error HTTP ${response.statusCode}',
-          };
-        }
-      } catch (_) {}
-      return {'success': false, 'error': 'Error HTTP ${response.statusCode}'};
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
-    }
-  }
+  static Future<Map<String, dynamic>> testSIEMConnection(SIEMConfig config) => AuthSecurityApi.testSIEMConnection(config);
 
   /// Verifies cryptographic SHA-256 integrity of the audit trail (ENS op.mon.1).
-  static Future<AuditVerificationResult> verifyAuditChain() async {
-    try {
-      final response = await http.get(Uri.parse('/api/security/audit-logs/verify'), headers: authHeaders);
-      if (response.statusCode == 200) {
-        return AuditVerificationResult.fromJson(jsonDecode(response.body));
-      }
-      return AuditVerificationResult(
-        valid: false,
-        totalRecords: 0,
-        verifiedRecords: 0,
-        lastHash: '',
-        error: 'Failed to verify chain: ${response.statusCode}',
-      );
-    } catch (e) {
-      return AuditVerificationResult(
-        valid: false,
-        totalRecords: 0,
-        verifiedRecords: 0,
-        lastHash: '',
-        error: e.toString(),
-      );
-    }
-  }
+  static Future<AuditVerificationResult> verifyAuditChain() => AuthSecurityApi.verifyAuditChain();
 
   /// Downloads export file of the forensic audit trail (CSV, JSON, LOG).
-  static Future<void> downloadAuditLogsExport(String format) async {
-    try {
-      final res = await http.get(
-        Uri.parse('/api/security/audit-logs/export?format=$format'),
-        headers: authHeaders,
-      );
-      if (res.statusCode == 200) {
-        final bytes = res.bodyBytes;
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', 'audit-trail-${DateTime.now().millisecondsSinceEpoch}.$format')
-          ..click();
-        html.Url.revokeObjectUrl(url);
-      }
-    } catch (_) {}
-  }
+  static Future<void> downloadAuditLogsExport(String format) => AuthSecurityApi.downloadAuditLogsExport(format);
 
   /// Checks status and readiness of Loki aggregator.
-  static Future<Map<String, dynamic>> fetchLokiStatus() async {
-    try {
-      final response = await http.get(Uri.parse("/api/logs/status"), headers: authHeaders);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-    } catch (_) {}
-    return {"active": false, "driver": "docker_fallback"};
-  }
+  static Future<Map<String, dynamic>> fetchLokiStatus() => ObservabilityWafApi.fetchLokiStatus();
 
   /// Fetches available containers, nodes, stacks, and streams for Loki filters.
-  static Future<LokiLabelsResponse> fetchLokiLogLabels() async {
-    try {
-      final response = await http.get(Uri.parse("/api/logs/labels"), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return LokiLabelsResponse.fromJson(data);
-      }
-    } catch (_) {}
-    return LokiLabelsResponse(containers: [], nodes: [], stacks: [], streams: [], levels: []);
-  }
+  static Future<LokiLabelsResponse> fetchLokiLogLabels() => ObservabilityWafApi.fetchLokiLogLabels();
 
   /// Queries logs with multi-dimensional filtering.
   static Future<Map<String, dynamic>> queryLokiLogs({
@@ -1924,57 +540,10 @@ class ApiService {
     String level = "",
     String timeRange = "1h",
     int limit = 200,
-  }) async {
-    try {
-      List<String> params = [];
-      if (query.isNotEmpty) params.add("query=${Uri.encodeQueryComponent(query)}");
-      if (container.isNotEmpty) params.add("container=${Uri.encodeQueryComponent(container)}");
-      if (node.isNotEmpty) params.add("node=${Uri.encodeQueryComponent(node)}");
-      if (stack.isNotEmpty) params.add("stack=${Uri.encodeQueryComponent(stack)}");
-      if (stream.isNotEmpty) params.add("stream=${Uri.encodeQueryComponent(stream)}");
-      if (level.isNotEmpty) params.add("level=${Uri.encodeQueryComponent(level)}");
-      params.add("range=$timeRange");
-      params.add("limit=$limit");
-
-      var url = "/api/logs/query";
-      if (params.isNotEmpty) {
-        url += "?${params.join("&")}";
-      }
-
-      final response = await http.get(Uri.parse(url), headers: authHeaders);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final list = (data["logs"] as List? ?? [])
-            .map((e) => LokiLogEntry.fromJson(e))
-            .toList();
-        return {
-          "status": data["status"] ?? "success",
-          "driver": data["driver"] ?? "loki",
-          "total": data["total"] ?? list.length,
-          "logs": list,
-        };
-      }
-    } catch (_) {}
-    return {"status": "error", "driver": "none", "total": 0, "logs": <LokiLogEntry>[]};
-  }
-
-  // ── Storage & Backups API Methods ─────────────────────────────────
+  }) => ObservabilityWafApi.queryLokiLogs(query: query, container: container, node: node, stack: stack, stream: stream, level: level, timeRange: timeRange, limit: limit);
 
   /// Fetches all cluster persistent volumes, docker volumes, and bind mounts.
-  static Future<List<StorageVolumeModel>> fetchStorageVolumes({String? targetNode}) async {
-    final url = (targetNode != null && targetNode.isNotEmpty && targetNode != 'all')
-        ? '/api/storage/volumes?node=${Uri.encodeQueryComponent(targetNode)}'
-        : '/api/storage/volumes';
-    final response = await http.get(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final list = (data['volumes'] as List? ?? [])
-          .map((e) => StorageVolumeModel.fromJson(e))
-          .toList();
-      return list;
-    }
-    throw Exception('Failed to fetch storage volumes: ${response.statusCode}');
-  }
+  static Future<List<StorageVolumeModel>> fetchStorageVolumes({String? targetNode}) => StorageGlusterApi.fetchStorageVolumes(targetNode: targetNode);
 
   /// Creates a new Docker named volume on target nodes.
   static Future<String> createDockerVolume({
@@ -1983,142 +552,42 @@ class ApiService {
     String driver = 'local',
     Map<String, String>? driverOpts,
     Map<String, String>? labels,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/volumes/docker'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'name': name,
-        'driver': driver,
-        'target_node': targetNode,
-        if (driverOpts != null && driverOpts.isNotEmpty) 'driver_opts': driverOpts,
-        if (labels != null && labels.isNotEmpty) 'labels': labels,
-      }),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['message'] ?? 'Volume created successfully';
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to create volume (${response.statusCode})');
-  }
+  }) => StorageGlusterApi.createDockerVolume(name: name, targetNode: targetNode, driver: driver, driverOpts: driverOpts, labels: labels);
 
   /// Deletes a Docker volume from target node(s).
   static Future<String> deleteDockerVolume({
     required String name,
     String? targetNode,
     bool force = false,
-  }) async {
-    final queryParams = <String, String>{
-      'name': name,
-      if (targetNode != null && targetNode.isNotEmpty) 'node': targetNode,
-      if (force) 'force': 'true',
-    };
-    final uri = Uri.parse('/api/storage/volumes/docker').replace(queryParameters: queryParams);
-    final response = await http.delete(uri, headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['message'] ?? 'Volume deleted successfully';
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to delete volume (${response.statusCode})');
-  }
+  }) => StorageGlusterApi.deleteDockerVolume(name: name, targetNode: targetNode, force: force);
 
   /// Prunes unused / dangling Docker volumes on target node(s).
-  static Future<String> pruneDockerVolumes({String? targetNode}) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/volumes/docker/prune'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'target_node': targetNode ?? 'all',
-      }),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['report'] ?? data['message'] ?? 'Pruned successfully';
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to prune volumes (${response.statusCode})');
-  }
+  static Future<String> pruneDockerVolumes({String? targetNode}) => StorageGlusterApi.pruneDockerVolumes(targetNode: targetNode);
 
   /// Inspects a Docker volume and returns JSON metadata.
   static Future<Map<String, dynamic>> inspectDockerVolume({
     required String name,
     String? targetNode,
-  }) async {
-    final queryParams = <String, String>{
-      'name': name,
-      if (targetNode != null && targetNode.isNotEmpty) 'node': targetNode,
-    };
-    final uri = Uri.parse('/api/storage/volumes/docker/inspect').replace(queryParameters: queryParams);
-    final response = await http.get(uri, headers: authHeaders);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to inspect volume (${response.statusCode})');
-  }
+  }) => StorageGlusterApi.inspectDockerVolume(name: name, targetNode: targetNode);
 
   /// Creates a new storage directory on target nodes.
   static Future<bool> createStorageDirectory({
     required String path,
     required String targetNode,
     String permissions = '0777',
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/directories'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'path': path,
-        'target_node': targetNode,
-        'permissions': permissions,
-      }),
-    );
-    return response.statusCode == 200;
-  }
+  }) => StorageGlusterApi.createStorageDirectory(path: path, targetNode: targetNode, permissions: permissions);
 
   /// Lists files and subdirectories within a given path on a specific node.
   static Future<List<DirectoryEntryModel>> listDirectoryContents({
     required String path,
     String? targetNode,
-  }) async {
-    final queryParams = <String, String>{'path': path};
-    if (targetNode != null && targetNode.isNotEmpty) {
-      queryParams['node'] = targetNode;
-    }
-    final uri = Uri.parse('/api/storage/directories/ls').replace(queryParameters: queryParams);
-    final response = await http.get(uri, headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['entries'] as List? ?? [])
-          .map((e) => DirectoryEntryModel.fromJson(e))
-          .toList();
-    }
-    throw Exception('Failed to list directory contents: ${response.statusCode}');
-  }
+  }) => StorageGlusterApi.listDirectoryContents(path: path, targetNode: targetNode);
 
   /// Fetches shared storage pool health and capacity diagnostics.
-  static Future<PoolHealthModel> fetchStoragePoolHealth({String path = '/var/contenedores'}) async {
-    final url = '/api/storage/pools/health?path=${Uri.encodeQueryComponent(path)}';
-    final response = await http.get(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return PoolHealthModel.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch storage pool health: ${response.statusCode}');
-  }
+  static Future<PoolHealthModel> fetchStoragePoolHealth({String path = '/var/contenedores'}) => StorageGlusterApi.fetchStoragePoolHealth(path: path);
 
   /// Fetches all backup archives.
-  static Future<List<BackupModel>> fetchBackups() async {
-    final response = await http.get(Uri.parse('/api/backups'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final list = (data['backups'] as List? ?? [])
-          .map((e) => BackupModel.fromJson(e))
-          .toList();
-      return list;
-    }
-    throw Exception('Failed to fetch backups: ${response.statusCode}');
-  }
+  static Future<List<BackupModel>> fetchBackups() => StorageGlusterApi.fetchBackups();
 
   /// Creates a new compressed backup archive (with optional AES-256-GCM encryption).
   static Future<BackupModel> createBackup({
@@ -2130,225 +599,57 @@ class ApiService {
     bool pauseContainers = true,
     bool encrypted = false,
     String encryptionPassphrase = '',
-  }) async {
-    final body = jsonEncode({
-      'name': name,
-      'stack_id': stackId,
-      'volume_name': volumeName,
-      'source_path': sourcePath,
-      'destination_path': destinationPath,
-      'pause_containers': pauseContainers,
-      'encrypted': encrypted,
-      'encryption_passphrase': encryptionPassphrase,
-    });
-    final response = await http.post(
-      Uri.parse('/api/backups/create'),
-      headers: authHeaders,
-      body: body,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return BackupModel.fromJson(data['backup']);
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to create backup');
-  }
+  }) => StorageGlusterApi.createBackup(name: name, stackId: stackId, volumeName: volumeName, sourcePath: sourcePath, destinationPath: destinationPath, pauseContainers: pauseContainers, encrypted: encrypted, encryptionPassphrase: encryptionPassphrase);
 
   /// Restores a backup archive to target directory (with optional AES-256-GCM decryption).
   static Future<bool> restoreBackup({
     required String backupId,
     String targetPath = '',
     String encryptionPassphrase = '',
-  }) async {
-    final body = jsonEncode({
-      'backup_id': backupId,
-      'target_path': targetPath,
-      'encryption_passphrase': encryptionPassphrase,
-    });
-    final response = await http.post(
-      Uri.parse('/api/backups/restore'),
-      headers: authHeaders,
-      body: body,
-    );
-    if (response.statusCode == 200) {
-      return true;
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to restore backup');
-  }
+  }) => StorageGlusterApi.restoreBackup(backupId: backupId, targetPath: targetPath, encryptionPassphrase: encryptionPassphrase);
 
   /// Deletes a backup archive.
-  static Future<bool> deleteBackup(String id) async {
-    final response = await http.delete(Uri.parse('/api/backups/$id'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteBackup(String id) => StorageGlusterApi.deleteBackup(id);
 
   /// Fetches all automated backup schedules.
-  static Future<List<BackupScheduleModel>> fetchBackupSchedules() async {
-    final response = await http.get(Uri.parse('/api/backups/schedules'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final list = (data['schedules'] as List? ?? [])
-          .map((e) => BackupScheduleModel.fromJson(e))
-          .toList();
-      return list;
-    }
-    throw Exception('Failed to fetch backup schedules: ${response.statusCode}');
-  }
+  static Future<List<BackupScheduleModel>> fetchBackupSchedules() => StorageGlusterApi.fetchBackupSchedules();
 
   /// Creates or updates a backup schedule.
-  static Future<BackupScheduleModel> saveBackupSchedule(BackupScheduleModel schedule) async {
-    final response = await http.post(
-      Uri.parse('/api/backups/schedules'),
-      headers: authHeaders,
-      body: jsonEncode(schedule.toJson()),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return BackupScheduleModel.fromJson(data['schedule']);
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to save schedule');
-  }
+  static Future<BackupScheduleModel> saveBackupSchedule(BackupScheduleModel schedule) => StorageGlusterApi.saveBackupSchedule(schedule);
 
   /// Deletes a backup schedule.
-  static Future<bool> deleteBackupSchedule(String id) async {
-    final response = await http.delete(Uri.parse('/api/backups/schedules/$id'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteBackupSchedule(String id) => StorageGlusterApi.deleteBackupSchedule(id);
 
   /// Fetches all network storage mounts (NFS, S3, Samba, /etc/fstab).
-  static Future<List<StorageMountModel>> fetchStorageMounts() async {
-    final response = await http.get(Uri.parse('/api/storage/mounts'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final list = (data['mounts'] as List? ?? [])
-          .map((e) => StorageMountModel.fromJson(e))
-          .toList();
-      return list;
-    }
-    throw Exception('Failed to fetch mounts: ${response.statusCode}');
-  }
+  static Future<List<StorageMountModel>> fetchStorageMounts() => StorageGlusterApi.fetchStorageMounts();
 
   /// Creates and mounts a new network storage entry.
-  static Future<StorageMountModel> createStorageMount(Map<String, dynamic> req) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/mounts'),
-      headers: authHeaders,
-      body: jsonEncode(req),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return StorageMountModel.fromJson(data['mount']);
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to configure mount');
-  }
+  static Future<StorageMountModel> createStorageMount(Map<String, dynamic> req) => StorageGlusterApi.createStorageMount(req);
 
   /// Tests connectivity and R/W access for a remote mount.
-  static Future<TestMountResultModel> testStorageMount(Map<String, dynamic> req) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/mounts/test'),
-      headers: authHeaders,
-      body: jsonEncode(req),
-    );
-    if (response.statusCode == 200) {
-      return TestMountResultModel.fromJson(jsonDecode(response.body));
-    }
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Failed to test mount');
-  }
+  static Future<TestMountResultModel> testStorageMount(Map<String, dynamic> req) => StorageGlusterApi.testStorageMount(req);
 
   /// Mounts an existing configured entry on target node(s).
-  static Future<bool> mountStorageEntry(String id, {String? targetNode}) async {
-    final body = targetNode != null && targetNode.isNotEmpty ? jsonEncode({'target_node': targetNode}) : null;
-    final response = await http.post(
-      Uri.parse('/api/storage/mounts/$id/mount'),
-      headers: authHeaders,
-      body: body,
-    );
-    if (response.statusCode == 200) return true;
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Mount failed');
-  }
+  static Future<bool> mountStorageEntry(String id, {String? targetNode}) => StorageGlusterApi.mountStorageEntry(id, targetNode: targetNode);
 
   /// Unmounts an existing entry from target node(s).
-  static Future<bool> unmountStorageEntry(String id, {String? targetNode}) async {
-    final body = targetNode != null && targetNode.isNotEmpty ? jsonEncode({'target_node': targetNode}) : null;
-    final response = await http.post(
-      Uri.parse('/api/storage/mounts/$id/unmount'),
-      headers: authHeaders,
-      body: body,
-    );
-    if (response.statusCode == 200) return true;
-    final errData = jsonDecode(response.body);
-    throw Exception(errData['error'] ?? 'Unmount failed');
-  }
+  static Future<bool> unmountStorageEntry(String id, {String? targetNode}) => StorageGlusterApi.unmountStorageEntry(id, targetNode: targetNode);
 
   /// Deletes a mount and cleans up /etc/fstab across target nodes.
   /// If deleteGluster is true, also deletes the underlying GlusterFS volume.
-  static Future<bool> deleteStorageMount(String id, {bool deleteGluster = false}) async {
-    final url = deleteGluster ? '/api/storage/mounts/$id?delete_gluster=true' : '/api/storage/mounts/$id';
-    final response = await http.delete(Uri.parse(url), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteStorageMount(String id, {bool deleteGluster = false}) => StorageGlusterApi.deleteStorageMount(id, deleteGluster: deleteGluster);
 
   /// Executes mount -a on host or all cluster nodes.
-  static Future<String> mountAllStorageEntries({String? targetNode}) async {
-    final body = targetNode != null && targetNode.isNotEmpty ? jsonEncode({'target_node': targetNode}) : null;
-    final response = await http.post(
-      Uri.parse('/api/storage/mounts/mount-all'),
-      headers: authHeaders,
-      body: body,
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      return data['output'] ?? 'OK';
-    }
-    throw Exception(data['error'] ?? 'mount -a failed');
-  }
+  static Future<String> mountAllStorageEntries({String? targetNode}) => StorageGlusterApi.mountAllStorageEntries(targetNode: targetNode);
 
   /// Fetches raw /etc/fstab contents from a specific host or local manager.
-  static Future<Map<String, dynamic>> fetchRawFstab({String? node}) async {
-    final query = (node != null && node.isNotEmpty) ? '?node=$node' : '';
-    final response = await http.get(Uri.parse('/api/storage/fstab/raw$query'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    throw Exception('Failed to read fstab: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> fetchRawFstab({String? node}) => StorageGlusterApi.fetchRawFstab(node: node);
 
   /// Saves and safely writes raw /etc/fstab on target node(s) with automated backup.
-  static Future<String> saveRawFstab(String content, {String? node}) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/fstab/raw'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'node': node ?? 'all',
-        'content': content,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      return data['message'] ?? 'fstab saved successfully';
-    }
-    throw Exception(data['error'] ?? 'Failed to save /etc/fstab');
-  }
-
-  // ── Docker Daemon Management (/etc/docker/daemon.json) ──────────────────────
+  static Future<String> saveRawFstab(String content, {String? node}) => StorageGlusterApi.saveRawFstab(content, node: node);
 
   /// Fetches the status and configuration of /etc/docker/daemon.json across nodes.
-  static Future<Map<String, dynamic>> fetchDockerDaemonConfig({String? scope, String? node}) async {
-    final params = <String>[];
-    if (scope != null && scope.isNotEmpty) params.add('scope=${Uri.encodeComponent(scope)}');
-    if (node != null && node.isNotEmpty) params.add('node=${Uri.encodeComponent(node)}');
-    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
-    final response = await http.get(Uri.parse('/api/docker/daemon$query'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    throw Exception('Failed to fetch Docker daemon status: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> fetchDockerDaemonConfig({String? scope, String? node}) => StorageGlusterApi.fetchDockerDaemonConfig(scope: scope, node: node);
 
   /// Saves, backs up, and applies /etc/docker/daemon.json to target nodes.
   static Future<Map<String, dynamic>> saveDockerDaemonConfig({
@@ -2357,149 +658,31 @@ class ApiService {
     required String rawJson,
     required String action,
     bool backup = true,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/docker/daemon'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'target_scope': targetScope,
-        'node_id': nodeId ?? '',
-        'raw_json': rawJson,
-        'action': action,
-        'backup': backup,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200) {
-      return data;
-    }
-    throw Exception(data['error'] ?? 'Failed to apply Docker daemon configuration');
-  }
-
-  // ── Image Security & SBOM API Methods ──────────────────────────────────────
+  }) => StorageGlusterApi.saveDockerDaemonConfig(targetScope: targetScope, nodeId: nodeId, rawJson: rawJson, action: action, backup: backup);
 
   /// Fetches all image vulnerability scans and cluster security summary.
-  static Future<Map<String, dynamic>> fetchImageScans() async {
-    final response = await http.get(Uri.parse('/api/security/scans'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final scans = (data['scans'] as List? ?? [])
-          .map((e) => ImageScanModel.fromJson(e))
-          .toList();
-      final summary = data['summary'] != null ? SecuritySummaryModel.fromJson(data['summary']) : SecuritySummaryModel();
-      return {
-        'scans': scans,
-        'summary': summary,
-      };
-    }
-    throw Exception('Failed to fetch security scans: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> fetchImageScans() => ImageComplianceApi.fetchImageScans();
 
   /// Fetches details and CVEs for a specific scan ID.
-  static Future<Map<String, dynamic>> fetchScanDetails(String scanId) async {
-    final response = await http.get(Uri.parse('/api/security/scans/$scanId'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final scan = ImageScanModel.fromJson(data['scan']);
-      final vulns = (data['vulnerabilities'] as List? ?? [])
-          .map((e) => ImageVulnerabilityModel.fromJson(e))
-          .toList();
-      return {
-        'scan': scan,
-        'vulnerabilities': vulns,
-      };
-    }
-    throw Exception('Failed to fetch scan details: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> fetchScanDetails(String scanId) => ImageComplianceApi.fetchScanDetails(scanId);
 
   /// Triggers an immediate vulnerability scan for an image.
-  static Future<Map<String, dynamic>> triggerImageScan(String image) async {
-    final response = await http.post(
-      Uri.parse('/api/security/scans/trigger'),
-      headers: authHeaders,
-      body: jsonEncode({'image': image}),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return {
-        'scan': ImageScanModel.fromJson(data['scan']),
-        'vulnerabilities': (data['vulnerabilities'] as List? ?? [])
-            .map((e) => ImageVulnerabilityModel.fromJson(e))
-            .toList(),
-      };
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Scan failed');
-  }
+  static Future<Map<String, dynamic>> triggerImageScan(String image) => ImageComplianceApi.triggerImageScan(image);
 
   /// Forces a complete re-scan and sync of all cluster images across all hosts.
-  static Future<Map<String, dynamic>> syncAllImageScans() async {
-    final response = await http.post(
-      Uri.parse('/api/security/scans/sync-all'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final scans = (data['scans'] as List? ?? [])
-          .map((e) => ImageScanModel.fromJson(e))
-          .toList();
-      final summary = data['summary'] != null ? SecuritySummaryModel.fromJson(data['summary']) : SecuritySummaryModel();
-      return {
-        'scans': scans,
-        'summary': summary,
-      };
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Sync failed');
-  }
+  static Future<Map<String, dynamic>> syncAllImageScans() => ImageComplianceApi.syncAllImageScans();
 
   /// Fetches trusted public signing keys.
-  static Future<List<TrustedKeyModel>> fetchTrustedKeys() async {
-    final response = await http.get(Uri.parse('/api/security/keys'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final list = (data['keys'] as List? ?? [])
-          .map((e) => TrustedKeyModel.fromJson(e))
-          .toList();
-      return list;
-    }
-    throw Exception('Failed to fetch trusted keys: ${response.statusCode}');
-  }
+  static Future<List<TrustedKeyModel>> fetchTrustedKeys() => ImageComplianceApi.fetchTrustedKeys();
 
   /// Generates a new Cosign ECDSA keypair.
-  static Future<Map<String, dynamic>> generateTrustedKey(String name, {bool isDefault = false}) async {
-    final response = await http.post(
-      Uri.parse('/api/security/keys/generate'),
-      headers: authHeaders,
-      body: jsonEncode({'name': name, 'is_default': isDefault}),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Keypair generation failed');
-  }
+  static Future<Map<String, dynamic>> generateTrustedKey(String name, {bool isDefault = false}) => ImageComplianceApi.generateTrustedKey(name, isDefault: isDefault);
 
   /// Saves or imports an existing public key.
-  static Future<TrustedKeyModel> saveTrustedKey(String name, String pubPEM, {bool isDefault = false}) async {
-    final response = await http.post(
-      Uri.parse('/api/security/keys'),
-      headers: authHeaders,
-      body: jsonEncode({'name': name, 'public_key_pem': pubPEM, 'is_default': isDefault}),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return TrustedKeyModel.fromJson(data['key']);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to import key');
-  }
+  static Future<TrustedKeyModel> saveTrustedKey(String name, String pubPEM, {bool isDefault = false}) => ImageComplianceApi.saveTrustedKey(name, pubPEM, isDefault: isDefault);
 
   /// Deletes a trusted signing key.
-  static Future<bool> deleteTrustedKey(String id) async {
-    final response = await http.delete(Uri.parse('/api/security/keys/$id'), headers: authHeaders);
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteTrustedKey(String id) => ImageComplianceApi.deleteTrustedKey(id);
 
   /// Signs an image with an in-cluster key or manual private key.
   static Future<Map<String, dynamic>> signImage(
@@ -2507,82 +690,19 @@ class ApiService {
     String? keyId,
     String? privateKey,
     String signerName = 'Cluster Admin',
-  }) async {
-    final payload = <String, dynamic>{
-      'image': image,
-      'signer_name': signerName,
-    };
-    if (keyId != null && keyId.isNotEmpty) {
-      payload['key_id'] = keyId;
-    }
-    if (privateKey != null && privateKey.isNotEmpty) {
-      payload['private_key'] = privateKey;
-    }
-
-    final response = await http.post(
-      Uri.parse('/api/security/sign'),
-      headers: authHeaders,
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Image signing failed');
-  }
+  }) => ImageComplianceApi.signImage(image, keyId: keyId, privateKey: privateKey, signerName: signerName);
 
   /// Revokes/removes the cryptographic signature from an image.
-  static Future<bool> unsignImage(String image) async {
-    final response = await http.post(
-      Uri.parse('/api/security/unsign'),
-      headers: authHeaders,
-      body: jsonEncode({'image': image}),
-    );
-    if (response.statusCode == 200) {
-      return true;
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to revoke image signature');
-  }
+  static Future<bool> unsignImage(String image) => ImageComplianceApi.unsignImage(image);
 
   /// Fetches cluster admission security policy.
-  static Future<SecurityPolicyModel> fetchSecurityPolicy() async {
-    final response = await http.get(Uri.parse('/api/security/policy'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return SecurityPolicyModel.fromJson(data['policy']);
-    }
-    throw Exception('Failed to fetch security policy: ${response.statusCode}');
-  }
+  static Future<SecurityPolicyModel> fetchSecurityPolicy() => ImageComplianceApi.fetchSecurityPolicy();
 
   /// Saves cluster admission security policy.
-  static Future<SecurityPolicyModel> saveSecurityPolicy(SecurityPolicyModel policy) async {
-    final response = await http.post(
-      Uri.parse('/api/security/policy'),
-      headers: authHeaders,
-      body: jsonEncode(policy.toJson()),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return SecurityPolicyModel.fromJson(data['policy']);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to update policy');
-  }
+  static Future<SecurityPolicyModel> saveSecurityPolicy(SecurityPolicyModel policy) => ImageComplianceApi.saveSecurityPolicy(policy);
 
   /// Fetches suggested upgrade versions, affected stacks, and risk analysis for a container image.
-  static Future<RemediationPreviewModel> fetchRemediationPreview(String image) async {
-    final response = await http.get(
-      Uri.parse('/api/security/remediate/preview?image=${Uri.encodeComponent(image)}'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return RemediationPreviewModel.fromJson(data);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to fetch remediation preview');
-  }
+  static Future<RemediationPreviewModel> fetchRemediationPreview(String image) => ImageComplianceApi.fetchRemediationPreview(image);
 
   /// Executes automated image upgrade in a stack with rollback protection and live step logs.
   static Future<RemediationResultModel> executeRemediation({
@@ -2590,115 +710,25 @@ class ApiService {
     required String currentImage,
     required String targetImage,
     bool autoRollback = true,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/security/remediate'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'stack_id': stackId,
-        'current_image': currentImage,
-        'target_image': targetImage,
-        'auto_rollback': autoRollback,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    return RemediationResultModel.fromJson(data);
-  }
+  }) => ImageComplianceApi.executeRemediation(stackId: stackId, currentImage: currentImage, targetImage: targetImage, autoRollback: autoRollback);
 
   /// Deletes a specific image scan report and its CVEs from cluster state.
-  static Future<bool> deleteImageScan(String scanIdOrImage) async {
-    final response = await http.delete(
-      Uri.parse('/api/security/scans/${Uri.encodeComponent(scanIdOrImage)}'),
-      headers: authHeaders,
-    );
-    return response.statusCode == 200;
-  }
+  static Future<bool> deleteImageScan(String scanIdOrImage) => ImageComplianceApi.deleteImageScan(scanIdOrImage);
 
   /// Prunes all scan reports of images that are no longer used by any active stack.
-  static Future<Map<String, dynamic>> pruneOrphanImageScans() async {
-    final response = await http.post(
-      Uri.parse('/api/security/scans/prune-orphans'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final scans = (data['scans'] as List? ?? [])
-          .map((e) => ImageScanModel.fromJson(e))
-          .toList();
-      final summary = data['summary'] != null ? SecuritySummaryModel.fromJson(data['summary']) : SecuritySummaryModel();
-      return {
-        'purged': data['purged'] ?? 0,
-        'scans': scans,
-        'summary': summary,
-      };
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Prune failed');
-  }
-
-  // ─── Docker Host Images & Build Forge Services ────────────────────────────
+  static Future<Map<String, dynamic>> pruneOrphanImageScans() => ImageComplianceApi.pruneOrphanImageScans();
 
   /// Fetches physical Docker images stored on cluster nodes.
-  static Future<List<HostDockerImageModel>> fetchHostDockerImages({String node = 'all'}) async {
-    final response = await http.get(
-      Uri.parse('/api/images/host-list?node=${Uri.encodeComponent(node)}'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final list = (data['images'] as List? ?? [])
-          .map((e) => HostDockerImageModel.fromJson(e))
-          .toList();
-      return list;
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to list host images');
-  }
+  static Future<List<HostDockerImageModel>> fetchHostDockerImages({String node = 'all'}) => ImageComplianceApi.fetchHostDockerImages(node: node);
 
   /// Inspects layer history and reconstructed Dockerfile for a Docker image.
-  static Future<ImageHistoryModel> fetchImageHistory(String image, {String node = 'manager'}) async {
-    final response = await http.get(
-      Uri.parse('/api/images/history?image=${Uri.encodeComponent(image)}&node=${Uri.encodeComponent(node)}'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return ImageHistoryModel.fromJson(data);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to inspect image history');
-  }
+  static Future<ImageHistoryModel> fetchImageHistory(String image, {String node = 'manager'}) => ImageComplianceApi.fetchImageHistory(image, node: node);
 
   /// Deletes a physical Docker image from a specific node or all cluster nodes.
-  static Future<Map<String, dynamic>> deleteHostDockerImage(String image, {String node = 'all', bool force = false, bool purgeDb = true}) async {
-    final response = await http.delete(
-      Uri.parse('/api/images/host-delete?image=${Uri.encodeComponent(image)}&node=${Uri.encodeComponent(node)}&force=$force&purge_db=$purgeDb'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to delete image from host');
-  }
+  static Future<Map<String, dynamic>> deleteHostDockerImage(String image, {String node = 'all', bool force = false, bool purgeDb = true}) => ImageComplianceApi.deleteHostDockerImage(image, node: node, force: force, purgeDb: purgeDb);
 
   /// Prunes unused and dangling Docker images across cluster nodes to reclaim disk space.
-  static Future<ImagePruneResultModel> pruneHostDockerImages({String node = 'all', bool allUnused = true}) async {
-    final response = await http.post(
-      Uri.parse('/api/images/prune'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'node': node,
-        'all_unused': allUnused,
-      }),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return ImagePruneResultModel.fromJson(data);
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to prune host images');
-  }
+  static Future<ImagePruneResultModel> pruneHostDockerImages({String node = 'all', bool allUnused = true}) => ImageComplianceApi.pruneHostDockerImages(node: node, allUnused: allUnused);
 
   /// Builds a Docker image on a Centurion node from a Dockerfile in The Imperial Forge.
   static Future<ImageBuildResultModel> buildDockerImage({
@@ -2707,383 +737,103 @@ class ApiService {
     String node = 'manager',
     Map<String, String>? buildArgs,
     bool noCache = false,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/images/build'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'tag': tag,
-        'dockerfile': dockerfile,
-        'node_id': node,
-        'build_args': buildArgs ?? {},
-        'no_cache': noCache,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || data['result'] != null) {
-      return ImageBuildResultModel.fromJson(data['result'] ?? data);
-    }
-    final err = data['error'] ?? 'Build failed';
-    throw Exception(err);
-  }
+  }) => ImageComplianceApi.buildDockerImage(tag: tag, dockerfile: dockerfile, node: node, buildArgs: buildArgs, noCache: noCache);
 
   /// Distributes and loads a Docker image across Centurion cluster nodes.
   static Future<ImageDistributeResultModel> distributeDockerImage({
     required String image,
     String targetNode = 'all',
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/images/distribute'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'image': image,
-        'target_node': targetNode,
-      }),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || data['result'] != null) {
-      return ImageDistributeResultModel.fromJson(data['result'] ?? data);
-    }
-    final err = data['error'] ?? 'Distribution failed';
-    throw Exception(err);
-  }
+  }) => ImageComplianceApi.distributeDockerImage(image: image, targetNode: targetNode);
 
   /// Fetches transparent GitHub adoption stats & release metrics.
-  static Future<AdoptionStatsModel> fetchAdoptionStats({bool force = false}) async {
-    final url = force ? '/api/system/adoption?force=true' : '/api/system/adoption';
-    final response = await http.get(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return AdoptionStatsModel.fromJson(data);
-    }
-    throw Exception('Failed to fetch adoption stats: ${response.statusCode}');
-  }
-
-  // ─── GlusterFS Cluster Storage Services ───────────────────────────────────
+  static Future<AdoptionStatsModel> fetchAdoptionStats({bool force = false}) => ImageComplianceApi.fetchAdoptionStats(force: force);
 
   /// Fetches all peers in the GlusterFS trusted storage pool.
-  static Future<List<GlusterPeerModel>> fetchGlusterPeers() async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/peers'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['peers'] is List) {
-        return (data['peers'] as List).map((p) => GlusterPeerModel.fromJson(p)).toList();
-      }
-      return [];
-    }
-    throw Exception('Failed to fetch GlusterFS peers: ${response.statusCode}');
-  }
+  static Future<List<GlusterPeerModel>> fetchGlusterPeers() => StorageGlusterApi.fetchGlusterPeers();
 
   /// Probes a new node into the trusted storage pool.
-  static Future<void> probeGlusterPeer(String hostname) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/peers/probe'),
-      headers: authHeaders,
-      body: jsonEncode({'hostname': hostname}),
-    );
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to probe peer $hostname');
-    }
-  }
+  static Future<void> probeGlusterPeer(String hostname) => StorageGlusterApi.probeGlusterPeer(hostname);
 
   /// Detaches a peer from the trusted storage pool.
-  static Future<void> detachGlusterPeer(String hostname, {bool force = false}) async {
-    final url = force ? '/api/storage/gluster/peers/$hostname?force=true' : '/api/storage/gluster/peers/$hostname';
-    final response = await http.delete(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to detach peer $hostname');
-    }
-  }
+  static Future<void> detachGlusterPeer(String hostname, {bool force = false}) => StorageGlusterApi.detachGlusterPeer(hostname, force: force);
 
   /// Fetches all GlusterFS volumes.
-  static Future<List<GlusterVolumeModel>> fetchGlusterVolumes() async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/volumes'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['volumes'] is List) {
-        return (data['volumes'] as List).map((v) => GlusterVolumeModel.fromJson(v)).toList();
-      }
-      return [];
-    }
-    throw Exception('Failed to fetch GlusterFS volumes: ${response.statusCode}');
-  }
+  static Future<List<GlusterVolumeModel>> fetchGlusterVolumes() => StorageGlusterApi.fetchGlusterVolumes();
 
   /// Creates and tunes a new GlusterFS volume.
-  static Future<void> createGlusterVolume(Map<String, dynamic> payload) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/volumes'),
-      headers: authHeaders,
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to create GlusterFS volume');
-    }
-  }
+  static Future<void> createGlusterVolume(Map<String, dynamic> payload) => StorageGlusterApi.createGlusterVolume(payload);
 
   /// Deletes a GlusterFS volume and optionally unmounts from /etc/fstab across cluster nodes.
-  static Future<void> deleteGlusterVolume(String name, {bool unmount = true}) async {
-    final url = unmount ? '/api/storage/gluster/volumes/$name?unmount=true' : '/api/storage/gluster/volumes/$name?unmount=false';
-    final response = await http.delete(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to delete volume $name');
-    }
-  }
+  static Future<void> deleteGlusterVolume(String name, {bool unmount = true}) => StorageGlusterApi.deleteGlusterVolume(name, unmount: unmount);
 
   /// Deletes all GlusterFS volumes across the cluster.
-  static Future<void> deleteAllGlusterVolumes({bool unmount = true}) async {
-    final url = unmount ? '/api/storage/gluster/volumes/delete-all?unmount=true' : '/api/storage/gluster/volumes/delete-all?unmount=false';
-    final response = await http.post(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to delete all GlusterFS volumes');
-    }
-  }
+  static Future<void> deleteAllGlusterVolumes({bool unmount = true}) => StorageGlusterApi.deleteAllGlusterVolumes(unmount: unmount);
 
   /// Starts a GlusterFS volume.
-  static Future<void> startGlusterVolume(String name) async {
-    final response = await http.post(Uri.parse('/api/storage/gluster/volumes/$name/start'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to start volume $name');
-    }
-  }
+  static Future<void> startGlusterVolume(String name) => StorageGlusterApi.startGlusterVolume(name);
 
   /// Stops a GlusterFS volume.
-  static Future<void> stopGlusterVolume(String name, {bool force = false}) async {
-    final url = force ? '/api/storage/gluster/volumes/$name/stop?force=true' : '/api/storage/gluster/volumes/$name/stop';
-    final response = await http.post(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to stop volume $name');
-    }
-  }
+  static Future<void> stopGlusterVolume(String name, {bool force = false}) => StorageGlusterApi.stopGlusterVolume(name, force: force);
 
   /// Fetches self-healing & split-brain diagnostics for a volume.
-  static Future<GlusterHealModel> fetchGlusterHealReport(String name) async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/volumes/$name/heal'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return GlusterHealModel.fromJson(data['heal_report']);
-    }
-    throw Exception('Failed to fetch heal report: ${response.statusCode}');
-  }
+  static Future<GlusterHealModel> fetchGlusterHealReport(String name) => StorageGlusterApi.fetchGlusterHealReport(name);
 
   /// Triggers a manual self-heal cycle.
-  static Future<void> triggerGlusterSelfHeal(String name) async {
-    final response = await http.post(Uri.parse('/api/storage/gluster/volumes/$name/heal'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to trigger self-heal for $name');
-    }
-  }
+  static Future<void> triggerGlusterSelfHeal(String name) => StorageGlusterApi.triggerGlusterSelfHeal(name);
 
   /// Auto-mounts volume to /var/contenedores across cluster hosts or specific target nodes.
-  static Future<void> mountGlusterCluster(String name, {String mountPoint = '/var/contenedores', List<String>? targetNodes}) async {
-    final payload = <String, dynamic>{'mount_point': mountPoint};
-    if (targetNodes != null && targetNodes.isNotEmpty) {
-      payload['target_nodes'] = targetNodes;
-    }
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/volumes/$name/mount-cluster'),
-      headers: authHeaders,
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to mount volume $name across cluster');
-    }
-  }
+  static Future<void> mountGlusterCluster(String name, {String mountPoint = '/var/contenedores', List<String>? targetNodes}) => StorageGlusterApi.mountGlusterCluster(name, mountPoint: mountPoint, targetNodes: targetNodes);
 
   /// Fetches cluster diagnostics for GlusterFS.
-  static Future<GlusterClusterDiagnosticsModel> fetchGlusterDiagnostics() async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/diagnostics'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return GlusterClusterDiagnosticsModel.fromJson(data['diagnostics']);
-    }
-    throw Exception('Failed to fetch Gluster diagnostics: ${response.statusCode}');
-  }
+  static Future<GlusterClusterDiagnosticsModel> fetchGlusterDiagnostics() => StorageGlusterApi.fetchGlusterDiagnostics();
 
   /// Fetches real-time dedicated storage network traffic and interface discovery.
-  static Future<StorageNetworkReportModel> fetchStorageNetworkReport() async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/network'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return StorageNetworkReportModel.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch storage network report: ${response.statusCode}');
-  }
+  static Future<StorageNetworkReportModel> fetchStorageNetworkReport() => StorageGlusterApi.fetchStorageNetworkReport();
 
   /// Fetches real-time I/O performance and FOP profiling for a volume.
-  static Future<GlusterProfileReportModel> fetchGlusterVolumeProfile(String name) async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/volumes/$name/profile'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return GlusterProfileReportModel.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch profile for $name: ${response.statusCode}');
-  }
+  static Future<GlusterProfileReportModel> fetchGlusterVolumeProfile(String name) => StorageGlusterApi.fetchGlusterVolumeProfile(name);
 
   /// Starts volume profiling.
-  static Future<void> startGlusterVolumeProfile(String name) async {
-    final response = await http.post(Uri.parse('/api/storage/gluster/volumes/$name/profile/start'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to start profiling on $name');
-    }
-  }
+  static Future<void> startGlusterVolumeProfile(String name) => StorageGlusterApi.startGlusterVolumeProfile(name);
 
   /// Stops volume profiling.
-  static Future<void> stopGlusterVolumeProfile(String name) async {
-    final response = await http.post(Uri.parse('/api/storage/gluster/volumes/$name/profile/stop'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to stop profiling on $name');
-    }
-  }
+  static Future<void> stopGlusterVolumeProfile(String name) => StorageGlusterApi.stopGlusterVolumeProfile(name);
 
   /// Fetches directory path quotas for a volume.
-  static Future<GlusterQuotasReportModel> fetchGlusterQuotas(String name) async {
-    final response = await http.get(Uri.parse('/api/storage/gluster/volumes/$name/quotas'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return GlusterQuotasReportModel.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch quotas for $name: ${response.statusCode}');
-  }
+  static Future<GlusterQuotasReportModel> fetchGlusterQuotas(String name) => StorageGlusterApi.fetchGlusterQuotas(name);
 
   /// Sets or updates a directory quota limit on a volume.
-  static Future<void> setGlusterQuota(String name, String path, String hardLimit) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/volumes/$name/quotas'),
-      headers: authHeaders,
-      body: jsonEncode({'path': path, 'hard_limit': hardLimit}),
-    );
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to set quota on $name');
-    }
-  }
+  static Future<void> setGlusterQuota(String name, String path, String hardLimit) => StorageGlusterApi.setGlusterQuota(name, path, hardLimit);
 
   /// Disables quotas on a volume.
-  static Future<void> disableGlusterQuota(String name) async {
-    final response = await http.delete(Uri.parse('/api/storage/gluster/volumes/$name/quotas'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to disable quotas on $name');
-    }
-  }
+  static Future<void> disableGlusterQuota(String name) => StorageGlusterApi.disableGlusterQuota(name);
 
   /// Fetches volume snapshots.
-  static Future<List<GlusterSnapshotModel>> fetchGlusterSnapshots({String? volumeName}) async {
-    final url = volumeName != null && volumeName.isNotEmpty
-        ? '/api/storage/gluster/snapshots?volume=$volumeName'
-        : '/api/storage/gluster/snapshots';
-    final response = await http.get(Uri.parse(url), headers: authHeaders);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['snapshots'] is List) {
-        return (data['snapshots'] as List).map((s) => GlusterSnapshotModel.fromJson(s)).toList();
-      }
-      return [];
-    }
-    throw Exception('Failed to fetch snapshots: ${response.statusCode}');
-  }
+  static Future<List<GlusterSnapshotModel>> fetchGlusterSnapshots({String? volumeName}) => StorageGlusterApi.fetchGlusterSnapshots(volumeName: volumeName);
 
   /// Creates a point-in-time snapshot.
-  static Future<void> createGlusterSnapshot(String name, String volumeName, {String description = ''}) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/snapshots'),
-      headers: authHeaders,
-      body: jsonEncode({'name': name, 'volume_name': volumeName, 'description': description}),
-    );
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to create snapshot');
-    }
-  }
+  static Future<void> createGlusterSnapshot(String name, String volumeName, {String description = ''}) => StorageGlusterApi.createGlusterSnapshot(name, volumeName, description: description);
 
   /// Restores a snapshot (rollback).
-  static Future<void> restoreGlusterSnapshot(String name) async {
-    final response = await http.post(Uri.parse('/api/storage/gluster/snapshots/$name/restore'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to restore snapshot $name');
-    }
-  }
+  static Future<void> restoreGlusterSnapshot(String name) => StorageGlusterApi.restoreGlusterSnapshot(name);
 
   /// Deletes a snapshot.
-  static Future<void> deleteGlusterSnapshot(String name) async {
-    final response = await http.delete(Uri.parse('/api/storage/gluster/snapshots/$name'), headers: authHeaders);
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to delete snapshot $name');
-    }
-  }
+  static Future<void> deleteGlusterSnapshot(String name) => StorageGlusterApi.deleteGlusterSnapshot(name);
 
   /// Starts or stops volume rebalance.
-  static Future<Map<String, dynamic>> rebalanceGlusterVolume(String name, {String action = 'start'}) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/volumes/$name/rebalance?action=$action'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to rebalance $name');
-  }
+  static Future<Map<String, dynamic>> rebalanceGlusterVolume(String name, {String action = 'start'}) => StorageGlusterApi.rebalanceGlusterVolume(name, action: action);
 
   /// Sets or resets an advanced volume tuning option.
-  static Future<void> setGlusterVolumeOption(String name, String key, String value, {bool reset = false}) async {
-    final response = await http.post(
-      Uri.parse('/api/storage/gluster/volumes/$name/options'),
-      headers: authHeaders,
-      body: jsonEncode({'key': key, 'value': value, 'reset': reset}),
-    );
-    if (response.statusCode != 200) {
-      final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to configure option on $name');
-    }
-  }
+  static Future<void> setGlusterVolumeOption(String name, String key, String value, {bool reset = false}) => StorageGlusterApi.setGlusterVolumeOption(name, key, value, reset: reset);
 
   /// Fetches SRE Observability architecture profiles.
-  static Future<Map<String, dynamic>> getMonitorProfiles() async {
-    final response = await http.get(
-      Uri.parse('/api/monitor/profiles'),
-      headers: authHeaders,
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    throw Exception('Failed to load monitor profiles: ${response.statusCode}');
-  }
+  static Future<Map<String, dynamic>> getMonitorProfiles() => ObservabilityWafApi.getMonitorProfiles();
 
   /// Switches active SRE Observability stack architecture profile.
-  static Future<Map<String, dynamic>> switchMonitorProfile(String profileId) async {
-    final response = await http.post(
-      Uri.parse('/api/monitor/profiles/switch'),
-      headers: authHeaders,
-      body: jsonEncode({'profile': profileId}),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['error'] ?? 'Failed to switch SRE profile');
-  }
-
-  // ── eBPF Live Hub & Kernel Network Observability ───────────────────────────
+  static Future<Map<String, dynamic>> switchMonitorProfile(String profileId) => ObservabilityWafApi.switchMonitorProfile(profileId);
 
   /// Fetches global eBPF kernel stats and telemetry counters.
-  static Future<EbpfStats> fetchEbpfStats() async {
-    final response = await http.get(Uri.parse('/api/ebpf/stats'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return EbpfStats.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch eBPF stats: ${response.statusCode}');
-  }
+  static Future<EbpfStats> fetchEbpfStats() => ObservabilityWafApi.fetchEbpfStats();
 
   /// Fetches recent captured L4/L7 network flows.
   static Future<List<EbpfFlow>> fetchEbpfFlows({
@@ -3091,37 +841,10 @@ class ApiService {
     String? protocol,
     String? status,
     String? query,
-  }) async {
-    final params = <String, String>{'limit': limit.toString()};
-    if (protocol != null && protocol.isNotEmpty && protocol != 'ALL') {
-      params['protocol'] = protocol;
-    }
-    if (status != null && status.isNotEmpty && status != 'ALL') {
-      params['status'] = status;
-    }
-    if (query != null && query.isNotEmpty) {
-      params['q'] = query;
-    }
-    final uri = Uri.parse('/api/ebpf/flows').replace(queryParameters: params);
-    final response = await http.get(uri, headers: authHeaders);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        return decoded.map((item) => EbpfFlow.fromJson(item)).toList();
-      }
-      return [];
-    }
-    throw Exception('Failed to fetch eBPF flows: ${response.statusCode}');
-  }
+  }) => ObservabilityWafApi.fetchEbpfFlows(limit: limit, protocol: protocol, status: status, query: query);
 
   /// Fetches synthesized eBPF service mesh topology graph.
-  static Future<EbpfTopology> fetchEbpfTopology() async {
-    final response = await http.get(Uri.parse('/api/ebpf/topology'), headers: authHeaders);
-    if (response.statusCode == 200) {
-      return EbpfTopology.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to fetch eBPF topology: ${response.statusCode}');
-  }
+  static Future<EbpfTopology> fetchEbpfTopology() => ObservabilityWafApi.fetchEbpfTopology();
 
   /// Triggers on-demand eBPF traffic simulation.
   static Future<bool> simulateEbpfTraffic({
@@ -3129,212 +852,41 @@ class ApiService {
     int rate = 15,
     int durationS = 10,
     double errorPct = 0.0,
-  }) async {
-    final response = await http.post(
-      Uri.parse('/api/ebpf/simulate'),
-      headers: authHeaders,
-      body: jsonEncode({
-        'pattern': pattern,
-        'rate': rate,
-        'duration_s': durationS,
-        'error_pct': errorPct,
-      }),
-    );
-    return response.statusCode == 200;
-  }
-
-  // ── Esquema Nacional de Seguridad (ENS RD 311/2022) ──────────────────────────
+  }) => ObservabilityWafApi.simulateEbpfTraffic(pattern: pattern, rate: rate, durationS: durationS, errorPct: errorPct);
 
   /// Fetches Spanish ENS (RD 311/2022) compliance evaluation summary.
-  static Future<ENSSummaryModel?> fetchENSStatus() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/ens/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return ENSSummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<ENSSummaryModel?> fetchENSStatus() => ImageComplianceApi.fetchENSStatus();
 
   /// Downloads the technical ENS compliance and evidence report in Markdown or JSON.
-  static Future<String?> fetchENSReport({String format = 'markdown'}) async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/ens/report?format=$format'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> fetchENSReport({String format = 'markdown'}) => ImageComplianceApi.fetchENSReport(format: format);
 
   /// Fetches European NIS 2 Directive (EU 2022/2555) compliance evaluation summary.
-  static Future<NIS2SummaryModel?> fetchNIS2Status() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/nis2/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return NIS2SummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<NIS2SummaryModel?> fetchNIS2Status() => ImageComplianceApi.fetchNIS2Status();
 
   /// Downloads the technical NIS 2 compliance and evidence report in Markdown or JSON.
-  static Future<String?> fetchNIS2Report({String format = 'markdown'}) async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/nis2/report?format=$format'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> fetchNIS2Report({String format = 'markdown'}) => ImageComplianceApi.fetchNIS2Report(format: format);
 
   /// Fetches CIS Docker Benchmark v1.6.0 compliance assessment summary.
-  static Future<CISDockerSummaryModel?> fetchCISDockerStatus() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/cis-docker/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return CISDockerSummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<CISDockerSummaryModel?> fetchCISDockerStatus() => ImageComplianceApi.fetchCISDockerStatus();
 
   /// Downloads the technical CIS Docker Benchmark compliance report in Markdown or JSON.
-  static Future<String?> fetchCISDockerReport({String format = 'markdown'}) async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/cis-docker/report?format=$format'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> fetchCISDockerReport({String format = 'markdown'}) => ImageComplianceApi.fetchCISDockerReport(format: format);
 
   /// Fetches ISO/IEC 27001:2022 Annex A compliance evaluation.
-  static Future<ISO27001SummaryModel?> fetchISO27001Status() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/iso27001/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return ISO27001SummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<ISO27001SummaryModel?> fetchISO27001Status() => ImageComplianceApi.fetchISO27001Status();
 
   /// Downloads the formal ISO/IEC 27001 Statement of Applicability audit report.
-  static Future<String?> fetchISO27001Report({String format = 'text'}) async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/iso27001/report?format=$format'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> fetchISO27001Report({String format = 'text'}) => ImageComplianceApi.fetchISO27001Report(format: format);
 
   /// Fetches cluster compliance status against EU DORA (Regulation 2022/2554).
-  static Future<DORASummaryModel?> fetchDORAStatus() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/dora/status'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return DORASummaryModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<DORASummaryModel?> fetchDORAStatus() => ImageComplianceApi.fetchDORAStatus();
 
   /// Downloads the technical DORA operational resilience audit report.
-  static Future<String?> fetchDORAReport({String format = 'markdown'}) async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/dora/report?format=$format'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<String?> fetchDORAReport({String format = 'markdown'}) => ImageComplianceApi.fetchDORAReport(format: format);
 
   /// Fetches the unified Continuous Compliance Overview across all 5 regulatory frameworks.
-  static Future<ComplianceOverviewModel?> fetchComplianceOverview() async {
-    try {
-      final response = await http.get(
-        Uri.parse('/api/security/compliance/overview'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return ComplianceOverviewModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<ComplianceOverviewModel?> fetchComplianceOverview() => ImageComplianceApi.fetchComplianceOverview();
 
   /// Triggers an immediate, cluster-wide re-evaluation across all 4 regulatory frameworks.
-  static Future<ComplianceOverviewModel?> evaluateAllCompliance() async {
-    try {
-      final response = await http.post(
-        Uri.parse('/api/security/compliance/evaluate-all'),
-        headers: authHeaders,
-      );
-      if (response.statusCode == 200) {
-        return ComplianceOverviewModel.fromJson(jsonDecode(response.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<ComplianceOverviewModel?> evaluateAllCompliance() => ImageComplianceApi.evaluateAllCompliance();
 }
-
