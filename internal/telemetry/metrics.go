@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/storage"
+	"github.com/gubernator-org/gubernator/internal/storage"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

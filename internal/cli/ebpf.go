@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/ebpf"
+	"github.com/gubernator-org/gubernator/internal/ebpf"
 )
 
 var ebpfCmd = &cobra.Command{

@@ -13,8 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/aqueducts"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // testDBMutex ensures only one test at a time can initialize and use the database

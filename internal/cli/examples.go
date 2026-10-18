@@ -13,7 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/examples"
+	"github.com/gubernator-org/gubernator/internal/examples"
 )
 
 var examplesCmd = &cobra.Command{

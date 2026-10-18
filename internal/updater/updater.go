@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // UpdateInfo holds version comparison details and release notes.
@@ -86,7 +86,7 @@ func CheckLatestRelease(currentVersion string, forceRefresh bool) (*UpdateInfo, 
 	var candidates []candidate
 
 	// Source 1: GitHub Releases API (Primary source for rich changelogs)
-	relURL := fmt.Sprintf("https://api.github.com/repos/mario-ezquerro/gubernator/releases?per_page=15&_cb=%d", cb)
+	relURL := fmt.Sprintf("https://api.github.com/repos/gubernator-org/gubernator/releases?per_page=15&_cb=%d", cb)
 	if req, err := http.NewRequest("GET", relURL, nil); err == nil {
 		prepareReq(req)
 		if resp, err := client.Do(req); err == nil {
@@ -110,7 +110,7 @@ func CheckLatestRelease(currentVersion string, forceRefresh bool) (*UpdateInfo, 
 	}
 
 	// Source 2: GitHub Tags API (Immediate discovery right after git push, before CI completes)
-	tagURL := fmt.Sprintf("https://api.github.com/repos/mario-ezquerro/gubernator/tags?per_page=15&_cb=%d", cb)
+	tagURL := fmt.Sprintf("https://api.github.com/repos/gubernator-org/gubernator/tags?per_page=15&_cb=%d", cb)
 	if req, err := http.NewRequest("GET", tagURL, nil); err == nil {
 		prepareReq(req)
 		if resp, err := client.Do(req); err == nil {
@@ -123,7 +123,7 @@ func CheckLatestRelease(currentVersion string, forceRefresh bool) (*UpdateInfo, 
 							candidates = append(candidates, candidate{
 								version: tag,
 								notes:   "",
-								url:     fmt.Sprintf("https://github.com/mario-ezquerro/gubernator/releases/tag/%s", tag),
+								url:     fmt.Sprintf("https://github.com/gubernator-org/gubernator/releases/tag/%s", tag),
 							})
 						}
 					}
@@ -134,7 +134,7 @@ func CheckLatestRelease(currentVersion string, forceRefresh bool) (*UpdateInfo, 
 	}
 
 	// Source 3: GitHub Raw Content VERSION (Zero rate limit, instantly available on main branch)
-	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/VERSION?_cb=%d", cb)
+	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/gubernator-org/gubernator/main/VERSION?_cb=%d", cb)
 	if req, err := http.NewRequest("GET", rawURL, nil); err == nil {
 		prepareReq(req)
 		if resp, err := client.Do(req); err == nil {
@@ -145,7 +145,7 @@ func CheckLatestRelease(currentVersion string, forceRefresh bool) (*UpdateInfo, 
 					candidates = append(candidates, candidate{
 						version: rawV,
 						notes:   "",
-						url:     fmt.Sprintf("https://github.com/mario-ezquerro/gubernator/releases/tag/%s", rawV),
+						url:     fmt.Sprintf("https://github.com/gubernator-org/gubernator/releases/tag/%s", rawV),
 					})
 				}
 			}
@@ -177,7 +177,7 @@ func CheckLatestRelease(currentVersion string, forceRefresh bool) (*UpdateInfo, 
 	}
 	relURLOut := best.url
 	if relURLOut == "" {
-		relURLOut = fmt.Sprintf("https://github.com/mario-ezquerro/gubernator/releases/tag/%s", latest)
+		relURLOut = fmt.Sprintf("https://github.com/gubernator-org/gubernator/releases/tag/%s", latest)
 	}
 
 	updateAvailable := isNewerVersion(currentVersion, latest)
@@ -204,7 +204,7 @@ func fallbackInfo(current string) *UpdateInfo {
 		LatestVersion:   current,
 		UpdateAvailable: false,
 		ReleaseNotes:    "• Gubernator system operating on latest release\n• Core engine services active and synchronized",
-		ReleaseURL:      "https://github.com/mario-ezquerro/gubernator/releases",
+		ReleaseURL:      "https://github.com/gubernator-org/gubernator/releases",
 		CheckedAt:       time.Now().Format(time.RFC3339),
 	}
 }
@@ -317,7 +317,7 @@ func ApplyClusterUpdate(targetVersion string) error {
 
 		goos := runtime.GOOS
 		goarch := runtime.GOARCH
-		binURL := fmt.Sprintf("https://github.com/mario-ezquerro/gubernator/releases/download/%s/gbnt-%s-%s", targetVersion, goos, goarch)
+		binURL := fmt.Sprintf("https://github.com/gubernator-org/gubernator/releases/download/%s/gbnt-%s-%s", targetVersion, goos, goarch)
 		if goos == "windows" {
 			binURL += ".exe"
 		}

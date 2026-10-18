@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // RemediationStepLog represents a step in the automated remediation process.

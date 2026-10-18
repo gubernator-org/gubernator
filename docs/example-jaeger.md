@@ -4,7 +4,7 @@ This tutorial walks through deploying a microservice architecture configured wit
 
 ---
 
-> 📘 **Guía Paso a Paso para Desarrolladores**: Para aprender a configurar cualquier contenedor o aplicación propia (Python, Node.js, Go) para enviar trazas a Jaeger, lee la guía [`how-use-jaeger.md`](https://github.com/mario-ezquerro/gubernator/tree/main/examples/example-jaeger/how-use-jaeger.md).
+> 📘 **Guía Paso a Paso para Desarrolladores**: Para aprender a configurar cualquier contenedor o aplicación propia (Python, Node.js, Go) para enviar trazas a Jaeger, lee la guía [`how-use-jaeger.md`](https://github.com/gubernator-org/gubernator/tree/main/examples/example-jaeger/how-use-jaeger.md).
 
 ---
 

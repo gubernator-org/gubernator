@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
-	"github.com/mario-ezquerro/gubernator/internal/coredns"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/aqueducts"
+	"github.com/gubernator-org/gubernator/internal/coredns"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // GetCoreDNSConfig Get CoreDNS Configuration.

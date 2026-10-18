@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/monitor"
+	"github.com/gubernator-org/gubernator/internal/monitor"
 )
 
 // ScopeStatusHandler Get Weave Scope Network Topology Status.

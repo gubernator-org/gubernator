@@ -18,7 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 type ecdsaSignature struct {

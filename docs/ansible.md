@@ -1,6 +1,6 @@
 # Automated Cluster Provisioning with Ansible
 
-Gubernator provides a complete suite of production-ready Ansible playbooks and modular roles located in the [`ansible/`](https://github.com/mario-ezquerro/gubernator/tree/main/ansible) directory. These playbooks automate the preparation of fresh Linux hosts (Debian/Ubuntu, RHEL/Rocky/AlmaLinux/Fedora) and configure an operational Gubernator cluster in minutes.
+Gubernator provides a complete suite of production-ready Ansible playbooks and modular roles located in the [`ansible/`](https://github.com/gubernator-org/gubernator/tree/main/ansible) directory. These playbooks automate the preparation of fresh Linux hosts (Debian/Ubuntu, RHEL/Rocky/AlmaLinux/Fedora) and configure an operational Gubernator cluster in minutes.
 
 ---
 

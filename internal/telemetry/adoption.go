@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // AdoptionStats holds aggregated GitHub adoption metrics, release downloads, and cluster telemetry.
@@ -103,10 +103,10 @@ func GetAdoptionStats(forceRefresh bool) *AdoptionStats {
 		},
 		RecentReleases:   make([]ReleaseStats, 0),
 		ClusterStats:     getLocalClusterStats(),
-		DataSource:       "Official GitHub Releases & Repository API (https://api.github.com/repos/mario-ezquerro/gubernator)",
+		DataSource:       "Official GitHub Releases & Repository API (https://api.github.com/repos/gubernator-org/gubernator)",
 		PrivacyPolicy:    "100% GDPR compliant. Gubernator does not track, send or log any container payloads, private IP addresses, passwords or database data.",
 		TelemetryEnabled: IsTelemetryEnabled(),
-		DocumentationURL: "https://github.com/mario-ezquerro/gubernator#telemetry-adoption-metrics--privacy-transparency",
+		DocumentationURL: "https://github.com/gubernator-org/gubernator#telemetry-adoption-metrics--privacy-transparency",
 		CheckedAt:        time.Now().Format(time.RFC3339),
 	}
 
@@ -117,24 +117,32 @@ func GetAdoptionStats(forceRefresh bool) *AdoptionStats {
 
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	// 1. Query Releases for download counts
-	reqRel, err := http.NewRequest("GET", "https://api.github.com/repos/mario-ezquerro/gubernator/releases?per_page=100", nil)
-	if err == nil {
+	// 1. Query Releases for download counts (Primary org repo + historical legacy repo)
+	repos := []string{"gubernator-org/gubernator", "mario-ezquerro/gubernator"}
+	seenTags := make(map[string]bool)
+	totalDl := 0
+
+	for _, repoSlug := range repos {
+		reqRel, err := http.NewRequest("GET", "https://api.github.com/repos/"+repoSlug+"/releases?per_page=100", nil)
+		if err != nil {
+			continue
+		}
 		reqRel.Header.Set("User-Agent", "Gubernator-Adoption-Telemetry")
 		reqRel.Header.Set("Accept", "application/vnd.github.v3+json")
 		if resp, doErr := client.Do(reqRel); doErr == nil {
-			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusOK {
 				var releases []ghReleaseItem
 				if decErr := json.NewDecoder(resp.Body).Decode(&releases); decErr == nil {
-					stats.TotalReleases = len(releases)
-					if len(releases) > 0 {
-						stats.LatestReleaseTag = releases[0].TagName
-						stats.LatestReleaseDate = releases[0].PublishedAt
-					}
+					for _, r := range releases {
+						if !seenTags[r.TagName] {
+							seenTags[r.TagName] = true
+							stats.TotalReleases++
+							if stats.LatestReleaseTag == "" {
+								stats.LatestReleaseTag = r.TagName
+								stats.LatestReleaseDate = r.PublishedAt
+							}
+						}
 
-					totalDl := 0
-					for idx, r := range releases {
 						relDl := 0
 						for _, a := range r.Assets {
 							dl := a.DownloadCount
@@ -149,36 +157,42 @@ func GetAdoptionStats(forceRefresh bool) *AdoptionStats {
 								stats.DownloadsByOS["windows"] += dl
 							}
 						}
-						if idx < 10 {
+						if len(stats.RecentReleases) < 10 {
+							htmlURL := strings.ReplaceAll(r.HTMLURL, "mario-ezquerro/gubernator", "gubernator-org/gubernator")
 							stats.RecentReleases = append(stats.RecentReleases, ReleaseStats{
 								TagName:     r.TagName,
 								PublishedAt: r.PublishedAt,
 								Downloads:   relDl,
-								HTMLURL:     r.HTMLURL,
+								HTMLURL:     htmlURL,
 							})
 						}
 					}
-					stats.TotalDownloads = totalDl
 				}
 			}
+			_ = resp.Body.Close()
 		}
 	}
+	stats.TotalDownloads = totalDl
 
 	// 2. Query Repo Info for Stars, Forks, Watchers
-	reqRepo, err := http.NewRequest("GET", "https://api.github.com/repos/mario-ezquerro/gubernator", nil)
-	if err == nil {
-		reqRepo.Header.Set("User-Agent", "Gubernator-Adoption-Telemetry")
-		reqRepo.Header.Set("Accept", "application/vnd.github.v3+json")
-		if resp, err := client.Do(reqRepo); err == nil {
-			defer func() { _ = resp.Body.Close() }()
-			if resp.StatusCode == http.StatusOK {
-				var repo ghRepoInfo
-				if err := json.NewDecoder(resp.Body).Decode(&repo); err == nil {
-					stats.GitHubStars = repo.StargazersCount
-					stats.GitHubForks = repo.ForksCount
-					stats.GitHubWatchers = repo.WatchersCount
-					stats.GitHubOpenIssues = repo.OpenIssuesCount
+	for idx, repoSlug := range repos {
+		reqRepo, err := http.NewRequest("GET", "https://api.github.com/repos/"+repoSlug, nil)
+		if err == nil {
+			reqRepo.Header.Set("User-Agent", "Gubernator-Adoption-Telemetry")
+			reqRepo.Header.Set("Accept", "application/vnd.github.v3+json")
+			if resp, err := client.Do(reqRepo); err == nil {
+				if resp.StatusCode == http.StatusOK {
+					var repo ghRepoInfo
+					if err := json.NewDecoder(resp.Body).Decode(&repo); err == nil {
+						stats.GitHubStars += repo.StargazersCount
+						stats.GitHubForks += repo.ForksCount
+						stats.GitHubWatchers += repo.WatchersCount
+						if idx == 0 {
+							stats.GitHubOpenIssues = repo.OpenIssuesCount
+						}
+					}
 				}
+				_ = resp.Body.Close()
 			}
 		}
 	}

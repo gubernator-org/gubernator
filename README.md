@@ -1,23 +1,23 @@
 # <img src="docs/gubernator-icon.png" alt="Gubernator Icon" width="40" style="vertical-align: middle;"> Gubernator (gbnt)
 
-[![GitHub Release](https://img.shields.io/github/v/release/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/releases)
 [![Docker Image](https://img.shields.io/docker/v/cloudresources/gubernator?style=flat-square&color=blue&logo=docker)](https://hub.docker.com/repository/docker/cloudresources/gubernator/general)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/blob/main/go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mario-ezquerro/gubernator?style=flat-square)](https://goreportcard.com/report/github.com/mario-ezquerro/gubernator)
-[![License](https://img.shields.io/github/license/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/mario-ezquerro/gubernator/test.yml?branch=main&style=flat-square)](https://github.com/mario-ezquerro/gubernator/actions/workflows/test.yml)
-[![Documentation](https://img.shields.io/badge/docs-MkDocs-blue?style=flat-square)](https://mario-ezquerro.github.io/gubernator/)
-[![GitHub issues](https://img.shields.io/github/issues/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/pulls)
-[![GitHub stars](https://img.shields.io/github/stars/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/network)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/blob/main/go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gubernator-org/gubernator?style=flat-square)](https://goreportcard.com/report/github.com/gubernator-org/gubernator)
+[![License](https://img.shields.io/github/license/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/blob/main/LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/gubernator-org/gubernator/test.yml?branch=main&style=flat-square)](https://github.com/gubernator-org/gubernator/actions/workflows/test.yml)
+[![Documentation](https://img.shields.io/badge/docs-MkDocs-blue?style=flat-square)](https://gubernator-org.github.io/gubernator/)
+[![GitHub issues](https://img.shields.io/github/issues/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/pulls)
+[![GitHub stars](https://img.shields.io/github/stars/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/network)
 [![Docker Pulls](https://img.shields.io/docker/pulls/cloudresources/gubernator?style=flat-square&logo=docker)](https://hub.docker.com/r/cloudresources/gubernator)
 [![Docker Image Size](https://img.shields.io/docker/image-size/cloudresources/gubernator/latest?style=flat-square&color=blue&logo=docker)](https://hub.docker.com/r/cloudresources/gubernator)
-[![Go Reference](https://img.shields.io/badge/go-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/mario-ezquerro/gubernator)
-[![GitHub contributors](https://img.shields.io/github/contributors/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/graphs/contributors)
-[![GitHub repo size](https://img.shields.io/github/repo-size/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator)
-[![GitHub last commit](https://img.shields.io/github/last-commit/mario-ezquerro/gubernator?style=flat-square)](https://github.com/mario-ezquerro/gubernator/commits/main)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/mario-ezquerro/gubernator)
+[![Go Reference](https://img.shields.io/badge/go-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/gubernator-org/gubernator)
+[![GitHub contributors](https://img.shields.io/github/contributors/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/graphs/contributors)
+[![GitHub repo size](https://img.shields.io/github/repo-size/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator)
+[![GitHub last commit](https://img.shields.io/github/last-commit/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/commits/main)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gubernator-org/gubernator)
 
 
 Gubernator is a powerful "Goldilocks" orchestrator that combines the **simplicity of Docker Swarm** (native Compose support, easy cluster joining) with the **flexibility of Nomad** (task-based logic, labels for hardware/AI targeting).
@@ -61,11 +61,11 @@ Gubernator operates using a single, portable binary (`gbnt`) that can run as eit
 
 The `gbnt` CLI tool is compiled as a single, portable binary for Windows, macOS, and Linux.
 
- **[See the Official Installation Guide](https://mario-ezquerro.github.io/gubernator/install/)** to download and install the binary for your operating system.
+ **[See the Official Installation Guide](https://gubernator-org.github.io/gubernator/install/)** to download and install the binary for your operating system.
 
 If you prefer to compile from source (requires Go 1.24+ and CGO):
 ```bash
-git clone https://github.com/mario-ezquerro/gubernator.git
+git clone https://github.com/gubernator-org/gubernator.git
 cd gubernator
 go build -o gbnt ./cmd/gbnt
 ```
@@ -570,7 +570,7 @@ Gubernator values **openness, privacy, and full transparency**. You can view liv
 ### 🛡️ Data Origin & Zero Cluster Telemetry Guarantee
 
 1. **Transparent Public Data Sources:**
-   * Download counts and release history are queried transparently from the official public [GitHub Releases API](https://api.github.com/repos/mario-ezquerro/gubernator/releases). No private tracking cookies, pixels, or intrusive analytics scripts are used.
+   * Download counts and release history are queried transparently from the official public [GitHub Releases API](https://api.github.com/repos/gubernator-org/gubernator/releases). No private tracking cookies, pixels, or intrusive analytics scripts are used.
 2. **100% On-Premise & GDPR Compliant:**
    * Gubernator **NEVER** sends, tracks, or logs your container images, environment variables, passwords/secrets, application database contents, or internal network topologies to external servers. All cluster operations remain 100% local to your hosts.
 3. **Air-Gapped & Complete Opt-Out:**
@@ -587,7 +587,7 @@ Gubernator values **openness, privacy, and full transparency**. You can view liv
 
 Gubernator's development is divided into "Campaigns". We've completed up to **Phase 46**, including full CLI parity, Native Docker Engine execution, CoreDNS/Caddy Ingress Automation, Asymmetric Port Security, Flutter Web Dashboard, built-in SRE Monitoring Stack, Google SRE Sloth SLO Engine, Enterprise Active Directory / LDAP Authentication + RBAC (`v2.20.0`), Dedicated Loki Logs Explorer (`v2.21.0`), Multi-Distro Ansible Automation (`v2.22.0`), Multi-Cloud Terraform Suite (`v2.23.0`), Persistent Storage & Backups ("The Granaries") (`v2.24.0`), Image Security, SBOM & Cosign Signing ("The Imperial Seal") (`v2.25.0`), Dedicated Compose Studio & Copilot (`v2.27.0`), Network Mounts & `/etc/fstab` Management (`v2.28.0`), Transparent Adoption Metrics & Privacy (`v2.29.0`), GlusterFS Cluster Storage Subsystem (`v2.30.0`), Host & Cluster Disk Monitoring (`v2.31.0`), Streamlined Host-Qualified DNS (`v2.58.2`), Dynamic & Customizable Enterprise Cluster Base Domain (`v2.59.0`), and Compose Studio Persistent Selection & Infallible Hardware Key Engine (`v2.59.3`).
 
-**[View the complete Roadmap and completed features here](https://mario-ezquerro.github.io/gubernator/roadmap/)**
+**[View the complete Roadmap and completed features here](https://gubernator-org.github.io/gubernator/roadmap/)**
 
 
 

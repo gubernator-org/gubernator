@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/docker"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/docker"
 )
 
 // Label constants for declarative Compose autoscaling

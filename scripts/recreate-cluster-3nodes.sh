@@ -194,7 +194,7 @@ for WORKER in gbnt-worker1 gbnt-worker2; do
   multipass exec "$WORKER" -- sudo bash -c "cat << 'EOF' > /etc/systemd/system/gbnt-worker.service
 [Unit]
 Description=Gubernator Worker Agent (Centurion)
-Documentation=https://github.com/mario-ezquerro/gubernator
+Documentation=https://github.com/gubernator-org/gubernator
 After=network-online.target docker.service
 Wants=network-online.target docker.service
 

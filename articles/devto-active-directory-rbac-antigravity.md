@@ -3,12 +3,12 @@ title: Building Enterprise Active Directory, LDAP & Dynamic RBAC in Go & Flutter
 published: false
 description: A deep dive into implementing multi-server Active Directory SSO (LDAPS), JWT authentication, and 3-tier RBAC for Gubernator using Google Antigravity as an AI pair programmer.
 tags: go, docker, devops, flutter, ai
-cover_image: https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/docs/images/security_ad.png
+cover_image: https://raw.githubusercontent.com/gubernator-org/gubernator/main/docs/images/security_ad.png
 ---
 
 # 🏛️ Building Enterprise Active Directory, LDAP & Dynamic RBAC in Go & Flutter with Google Antigravity
 
-When building a lightweight container orchestrator like **[Gubernator (gbnt)](https://github.com/mario-ezquerro/gubernator)** — designed to strike the perfect balance between the **simplicity of Docker Swarm** and the **flexibility of Nomad** under a Roman Empire theme — a critical milestone inevitably emerges: **Enterprise Security and Access Control**.
+When building a lightweight container orchestrator like **[Gubernator (gbnt)](https://github.com/gubernator-org/gubernator)** — designed to strike the perfect balance between the **simplicity of Docker Swarm** and the **flexibility of Nomad** under a Roman Empire theme — a critical milestone inevitably emerges: **Enterprise Security and Access Control**.
 
 While a default `admin` credential works well for local dev environments, moving into enterprise production with multi-disciplinary engineering teams demands:
 1. **Corporate Single Sign-On (SSO)** with Microsoft Active Directory and OpenLDAP.
@@ -167,12 +167,12 @@ Gubernator's Web Dashboard is built with **Flutter Web** and **Material Design 3
 ### 1. Modern Login Screen with Domain Selector
 Operators can select their target authentication provider (`Corporate Active Directory`, `DR Site LDAP`, or `Local Administrator`):
 
-![Login Screen](https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/docs/images/login_screen.png)
+![Login Screen](https://raw.githubusercontent.com/gubernator-org/gubernator/main/docs/images/login_screen.png)
 
 ### 2. Active Directory Management & Diagnostics
 In the new **Seguridad & AD** tab, cluster administrators can configure directory servers, TLS certificates, and run a live **"Test Connection"** diagnostic tool:
 
-![Security & AD Management](https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/docs/images/security_ad.png)
+![Security & AD Management](https://raw.githubusercontent.com/gubernator-org/gubernator/main/docs/images/security_ad.png)
 
 ### 3. Real-Time Role Badges & Contextual Guards
 The dashboard header displays the active user and their assigned role (`👑 ADMIN`, `⚡ OPERATOR`, `👁️ READ-ONLY`). Mutating actions (e.g., Delete Stack, Drain Node, Shell) are automatically disabled for read-only audit accounts.
@@ -201,7 +201,7 @@ We utilized **Google Antigravity (AGY)** as an autonomous AI pair programmer to 
 
 4. **Automated Documentation & Release**:
    - Generated high-fidelity visual UI showcases.
-   - Authored complete documentation in [`docs/auth-rbac.md`](https://mario-ezquerro.github.io/gubernator/auth-rbac/) and validated MkDocs builds in strict mode.
+   - Authored complete documentation in [`docs/auth-rbac.md`](https://gubernator-org.github.io/gubernator/auth-rbac/) and validated MkDocs builds in strict mode.
    - Bumped the version to `v2.20.0`, created git release tags, and triggered GitHub Pages publishing.
 
 ---
@@ -212,8 +212,8 @@ Adding Active Directory SSO and RBAC allows teams to deploy Gubernator in enterp
 
 Check out Gubernator and try it out:
 
-* 📦 **GitHub Repository:** [github.com/mario-ezquerro/gubernator](https://github.com/mario-ezquerro/gubernator)
-* 📖 **Official Documentation:** [mario-ezquerro.github.io/gubernator](https://mario-ezquerro.github.io/gubernator/)
-* 🛡️ **Active Directory & RBAC Guide:** [docs/auth-rbac.md](https://mario-ezquerro.github.io/gubernator/auth-rbac/)
+* 📦 **GitHub Repository:** [github.com/gubernator-org/gubernator](https://github.com/gubernator-org/gubernator)
+* 📖 **Official Documentation:** [gubernator-org.github.io/gubernator](https://gubernator-org.github.io/gubernator/)
+* 🛡️ **Active Directory & RBAC Guide:** [docs/auth-rbac.md](https://gubernator-org.github.io/gubernator/auth-rbac/)
 
 What do you think about this hybrid approach to container orchestration? Let us know your thoughts and suggestions in the comments! 🏛️

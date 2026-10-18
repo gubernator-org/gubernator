@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mario-ezquerro/gubernator/internal/cli"
-	"github.com/mario-ezquerro/gubernator/internal/web"
+	"github.com/gubernator-org/gubernator/internal/cli"
+	"github.com/gubernator-org/gubernator/internal/web"
 )
 
 // @title           Gubernator API

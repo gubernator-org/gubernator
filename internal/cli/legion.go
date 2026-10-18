@@ -15,12 +15,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/caddy"
-	"github.com/mario-ezquerro/gubernator/internal/coredns"
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/docker"
-	"github.com/mario-ezquerro/gubernator/internal/monitor"
-	"github.com/mario-ezquerro/gubernator/internal/timesync"
+	"github.com/gubernator-org/gubernator/internal/caddy"
+	"github.com/gubernator-org/gubernator/internal/coredns"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/docker"
+	"github.com/gubernator-org/gubernator/internal/monitor"
+	"github.com/gubernator-org/gubernator/internal/timesync"
 )
 
 var legionCmd = &cobra.Command{

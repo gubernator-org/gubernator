@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/docker"
+	"github.com/gubernator-org/gubernator/internal/docker"
 )
 
 var (

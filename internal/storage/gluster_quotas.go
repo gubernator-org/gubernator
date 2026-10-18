@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // GlusterVolumeQuota represents a directory path limit on a volume.

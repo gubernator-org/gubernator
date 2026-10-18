@@ -175,7 +175,7 @@ To ensure Gubernator can handle real-world, production-ready deployments, the fo
 * **Full CLI Parity:** Dedicated commands for `gbnt mount ls`, `gbnt mount add`, `gbnt mount rm`, `gbnt mount mount <id>`, `gbnt mount unmount <id>`, and `gbnt mount fstab`.
 
 ### 21. Transparent Adoption Metrics & Telemetry Privacy (`v2.29.0`)
-* **Public Adoption & Download Metrics:** Direct, transparent integration with official GitHub Releases API (`api.github.com/repos/mario-ezquerro/gubernator/releases`) calculating total binary downloads, OS breakdowns (Linux AMD64/ARM64, macOS Apple Silicon/Intel, Windows), release history, stars, and forks.
+* **Public Adoption & Download Metrics:** Direct, transparent integration with official GitHub Releases API (`api.github.com/repos/gubernator-org/gubernator/releases`) calculating total binary downloads, OS breakdowns (Linux AMD64/ARM64, macOS Apple Silicon/Intel, Windows), release history, stars, and forks.
 * **Settings ➔ About & Metrics Dashboard:** Visual KPI cards and platform download badges inside the Settings modal with live refresh capabilities.
 * **Zero Cluster Telemetry Guarantee:** Formal 100% on-premise guarantee ensuring no container images, payloads, secrets, database state, application logs, or internal network topology leave the local cluster.
 * **Air-Gapped & Privacy Overrides:** Full support for `DO_NOT_TRACK=1` and `GBNT_TELEMETRY=false` to completely disable external release and update checks.

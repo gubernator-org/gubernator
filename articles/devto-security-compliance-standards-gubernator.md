@@ -3,8 +3,8 @@ title: "The Only Container Orchestrator with Built-In Compliance: How Gubernator
 published: true
 tags: security, devops, docker, kubernetes
 series: Gubernator Orchestrator
-cover_image: https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/articles/images/gubernator_security_compliance_dora_cover.jpg
-canonical_url: https://github.com/mario-ezquerro/gubernator/blob/main/articles/devto-security-compliance-standards-gubernator.md
+cover_image: https://raw.githubusercontent.com/gubernator-org/gubernator/main/articles/images/gubernator_security_compliance_dora_cover.jpg
+canonical_url: https://github.com/gubernator-org/gubernator/blob/main/articles/devto-security-compliance-standards-gubernator.md
 description: "Discover how Gubernator revolutionizes container orchestration by natively baking in ENS RD 311/2022, EU NIS 2, EU DORA (Reg. 2022/2554), CIS Docker Benchmark, ISO 27001, SHA-256 audit ledger, Cosign, and SBOM into a single sovereign Go binary."
 ---
 
@@ -17,13 +17,13 @@ Over the past decade, container orchestration has been polarized into two stark 
 
 What happens when a public administration, healthcare provider, critical infrastructure operator, or financial institution needs to deploy containerized workloads meeting the strictest cybersecurity regulations without drowning in operational complexity and exorbitant infrastructure costs?
 
-The answer is **[Gubernator (`gbnt`)](https://github.com/mario-ezquerro/gubernator)**: the **first and only container orchestrator designed from the ground up with native enterprise cybersecurity and regulatory compliance**.
+The answer is **[Gubernator (`gbnt`)](https://github.com/gubernator-org/gubernator)**: the **first and only container orchestrator designed from the ground up with native enterprise cybersecurity and regulatory compliance**.
 
 In this deep dive, we explore Gubernator’s built-in security architecture, the international compliance frameworks it continuously audits in real time, its degradation-detecting watchdog, and why it represents a paradigm shift in technological sovereignty.
 
 ---
 
-![Gubernator Security & Compliance Suite](https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/articles/images/gubernator_security_compliance_dora_cover.jpg)
+![Gubernator Security & Compliance Suite](https://raw.githubusercontent.com/gubernator-org/gubernator/main/articles/images/gubernator_security_compliance_dora_cover.jpg)
 
 ---
 
@@ -296,6 +296,6 @@ By embedding the world's most rigorous compliance frameworks (**Spanish ENS RD 3
 
 If you operate in regulated industries, government agencies, financial institutions, healthcare, defense, or simply believe your infrastructure security shouldn't rely on 20 fragile plugins stitched together with duct tape, give Gubernator a run:
 
-👉 **Project Repository:** [https://github.com/mario-ezquerro/gubernator](https://github.com/mario-ezquerro/gubernator)  
+👉 **Project Repository:** [https://github.com/gubernator-org/gubernator](https://github.com/gubernator-org/gubernator)  
 ⭐ If you find this project valuable, star the repo and join our journey towards sovereign cloud-native computing!
 

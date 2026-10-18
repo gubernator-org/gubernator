@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/examples"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/examples"
 )
 
 var stackCmd = &cobra.Command{

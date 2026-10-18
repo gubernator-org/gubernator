@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // IsLocalHost checks whether the given IP address corresponds to the local host/manager.

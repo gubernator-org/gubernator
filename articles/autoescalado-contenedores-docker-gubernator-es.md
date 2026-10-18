@@ -3,8 +3,8 @@ title: "Autoescalado de Contenedores Docker sin Kubernetes: Cómo Gubernator esc
 published: true
 tags: devops, docker, spanish, cloud
 series: Gubernator Orchestrator
-cover_image: https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/articles/images/gubernator_autoscaling_cover.jpg
-canonical_url: https://github.com/mario-ezquerro/gubernator
+cover_image: https://raw.githubusercontent.com/gubernator-org/gubernator/main/articles/images/gubernator_autoscaling_cover.jpg
+canonical_url: https://github.com/gubernator-org/gubernator
 description: "Descubre cómo Gubernator ofrece escalado horizontal automático (HPA) declarativo para stacks de Docker Compose con métricas de CPU y GPUs NVIDIA en clústeres multi-nodo."
 ---
 
@@ -15,7 +15,7 @@ Al desplegar aplicaciones contenerizadas en producción, los equipos de desarrol
 
 ¿Y si pudieras mantener la sencillez absoluta de tus archivos **`docker-compose.yml`** habituales, pero con **verdadero autoescalado horizontal (HPA)** basado en el uso real de **CPU y GPUs NVIDIA** en un clúster de múltiples máquinas?
 
-Esa es precisamente la razón de ser de **[Gubernator (`gbnt`)](https://github.com/mario-ezquerro/gubernator)**: el orquestador "Goldilocks" que combina la simplicidad de Docker Swarm con la flexibilidad de Nomad y la seguridad empresarial.
+Esa es precisamente la razón de ser de **[Gubernator (`gbnt`)](https://github.com/gubernator-org/gubernator)**: el orquestador "Goldilocks" que combina la simplicidad de Docker Swarm con la flexibilidad de Nomad y la seguridad empresarial.
 
 ---
 
@@ -146,7 +146,7 @@ Desplegar Gubernator solo requiere descargar su binario único en Go:
 
 ```bash
 # Descarga para tu arquitectura (Linux AMD64/ARM64, macOS)
-curl -sSL https://github.com/mario-ezquerro/gubernator/releases/latest/download/gbnt-linux-amd64 -o gbnt
+curl -sSL https://github.com/gubernator-org/gubernator/releases/latest/download/gbnt-linux-amd64 -o gbnt
 chmod +x gbnt
 sudo mv gbnt /usr/local/bin/
 
@@ -159,4 +159,4 @@ Abre tu navegador en `http://localhost:4001` (Dashboard Web) y `http://localhost
 
 ---
 
-⭐ **Código abierto en GitHub:** [https://github.com/mario-ezquerro/gubernator](https://github.com/mario-ezquerro/gubernator)
+⭐ **Código abierto en GitHub:** [https://github.com/gubernator-org/gubernator](https://github.com/gubernator-org/gubernator)

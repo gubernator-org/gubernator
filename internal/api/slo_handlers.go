@@ -12,8 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/slo"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/slo"
 )
 
 type SLOItem struct {

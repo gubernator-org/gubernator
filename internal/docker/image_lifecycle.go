@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/storage"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/storage"
 )
 
 // HostDockerImage represents a physical Docker image stored on a cluster node.

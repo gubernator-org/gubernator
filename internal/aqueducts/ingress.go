@@ -8,8 +8,8 @@ package aqueducts
 	"path/filepath"
 	"strings"
 
-	"github.com/mario-ezquerro/gubernator/internal/caddy"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/caddy"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func init() {

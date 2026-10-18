@@ -1,6 +1,6 @@
 # Multi-Cloud Infrastructure with Terraform
 
-Gubernator provides a complete suite of Infrastructure as Code (IaC) templates in the [`terraform/`](https://github.com/mario-ezquerro/gubernator/tree/main/terraform) directory. These templates provision virtual machines, networks, firewalls, and security groups across major cloud providers and automatically generate the inventory for [Ansible Automation](ansible.md).
+Gubernator provides a complete suite of Infrastructure as Code (IaC) templates in the [`terraform/`](https://github.com/gubernator-org/gubernator/tree/main/terraform) directory. These templates provision virtual machines, networks, firewalls, and security groups across major cloud providers and automatically generate the inventory for [Ansible Automation](ansible.md).
 
 ---
 

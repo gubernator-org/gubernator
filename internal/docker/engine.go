@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/coredns"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/coredns"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func init() {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/storage"
+	"github.com/gubernator-org/gubernator/internal/storage"
 )
 
 var glusterCmd = &cobra.Command{

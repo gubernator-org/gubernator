@@ -3,12 +3,12 @@ title: Building Enterprise Storage, Backups & Cosign Image Security in Go & Flut
 published: false
 description: How we engineered multi-node shared storage mobility, automated point-in-time backups, CVE scanning, CycloneDX/SPDX SBOMs, and Cosign image signing in Gubernator with Google Antigravity AI.
 tags: go, devops, security, docker, ai
-cover_image: https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/docs/images/banner.png
+cover_image: https://raw.githubusercontent.com/gubernator-org/gubernator/main/docs/images/banner.png
 ---
 
 # 🏛️ Building Enterprise Storage, Point-in-Time Backups & Cosign Image Security in Go & Flutter with Google Antigravity
 
-When architecting a modern container orchestrator like **[Gubernator (gbnt)](https://github.com/mario-ezquerro/gubernator)** — designed to strike the **Goldilocks balance** between the simplicity of Docker Swarm and the placement flexibility of Nomad — two major enterprise pillars stand between an MVP and true production readiness:
+When architecting a modern container orchestrator like **[Gubernator (gbnt)](https://github.com/gubernator-org/gubernator)** — designed to strike the **Goldilocks balance** between the simplicity of Docker Swarm and the placement flexibility of Nomad — two major enterprise pillars stand between an MVP and true production readiness:
 
 1. **State Persistence & Backup Mobility (*The Granaries / Horreum*)**: Moving stateful containers (PostgreSQL, MySQL, Redis, custom data volumes) across worker nodes without data loss, backed by compressed point-in-time snapshots and retention policies.
 2. **Software Supply Chain Security & Admission Control (*The Imperial Seal / Armamentarium*)**: Detecting CVE vulnerabilities before deployment, cataloging dependencies via Software Bill of Materials (SBOM), signing container images with cryptographic keypairs (Cosign/Sigstore), and enforcing strict Gatekeeper admission policies.
@@ -193,8 +193,8 @@ Building a distributed orchestrator with state synchronization, cryptographic op
 
 ### 1. Specification-Driven Engineering
 Before writing code, we used Antigravity to formalize comprehensive architectural blueprints:
-- [`SPEC-storage-backups.md`](https://github.com/mario-ezquerro/gubernator/blob/main/SPEC-storage-backups.md)
-- [`SPEC-image-security.md`](https://github.com/mario-ezquerro/gubernator/blob/main/SPEC-image-security.md)
+- [`SPEC-storage-backups.md`](https://github.com/gubernator-org/gubernator/blob/main/SPEC-storage-backups.md)
+- [`SPEC-image-security.md`](https://github.com/gubernator-org/gubernator/blob/main/SPEC-image-security.md)
 
 Having structured specifications allowed the AI to implement the entire pipeline (GORM database schemas, pure Go cryptography, REST API routes, Flutter Dart models, and CLI flags) with complete architectural alignment.
 
@@ -215,7 +215,7 @@ Whether you are running a single-node homelab or an edge-distributed cluster, yo
 - Secure your software supply chain with automated CVE scanning and Cosign cryptographic signatures.
 
 Explore the project on GitHub:
-👉 **[GitHub: mario-ezquerro/gubernator](https://github.com/mario-ezquerro/gubernator)**
-📖 **[Official Documentation & Guides](https://mario-ezquerro.github.io/gubernator/)**
+👉 **[GitHub: gubernator-org/gubernator](https://github.com/gubernator-org/gubernator)**
+📖 **[Official Documentation & Guides](https://gubernator-org.github.io/gubernator/)**
 
 *Have you implemented image signing or shared volume mobility in your container setups? Share your thoughts in the comments below!*

@@ -3,8 +3,8 @@ title: "Autoscaling Docker Containers Without Kubernetes: How Gubernator Scales 
 published: true
 tags: devops, docker, go, cloud
 series: Gubernator Orchestrator
-cover_image: https://raw.githubusercontent.com/mario-ezquerro/gubernator/main/articles/images/gubernator_autoscaling_cover.jpg
-canonical_url: https://github.com/mario-ezquerro/gubernator/blob/main/articles/autoscaling-docker-compose-gubernator.md
+cover_image: https://raw.githubusercontent.com/gubernator-org/gubernator/main/articles/images/gubernator_autoscaling_cover.jpg
+canonical_url: https://github.com/gubernator-org/gubernator/blob/main/articles/autoscaling-docker-compose-gubernator.md
 description: "Discover how Gubernator delivers declarative Horizontal Pod Autoscaling (HPA) for plain Docker Compose stacks with CPU and NVIDIA GPU metrics across multi-node clusters."
 ---
 
@@ -15,7 +15,7 @@ When running containerized workloads, every engineering team eventually faces th
 
 What if you could keep the pure simplicity of standard **`docker-compose.yml`** files, but gain **true horizontal autoscaling** across multi-node clusters based on real-time **CPU and NVIDIA GPU utilization**?
 
-That is exactly why we built **[Gubernator (`gbnt`)](https://github.com/mario-ezquerro/gubernator)**—the "Goldilocks" container orchestrator that combines the dead-simple developer experience of Docker Swarm with the flexibility of Nomad and the enterprise governance of high-end platforms.
+That is exactly why we built **[Gubernator (`gbnt`)](https://github.com/gubernator-org/gubernator)**—the "Goldilocks" container orchestrator that combines the dead-simple developer experience of Docker Swarm with the flexibility of Nomad and the enterprise governance of high-end platforms.
 
 ---
 
@@ -153,7 +153,7 @@ Installing Gubernator takes a single binary or automated installer:
 
 ```bash
 # Download the latest binary for your architecture (Linux AMD64/ARM64, macOS)
-curl -sSL https://github.com/mario-ezquerro/gubernator/releases/latest/download/gbnt-linux-amd64 -o gbnt
+curl -sSL https://github.com/gubernator-org/gubernator/releases/latest/download/gbnt-linux-amd64 -o gbnt
 chmod +x gbnt
 sudo mv gbnt /usr/local/bin/
 
@@ -179,4 +179,4 @@ With **Gubernator**, you get:
 
 Give the project a star on GitHub and let us know your thoughts in the comments below!
 
-👉 **GitHub Repository:** [https://github.com/mario-ezquerro/gubernator](https://github.com/mario-ezquerro/gubernator)
+👉 **GitHub Repository:** [https://github.com/gubernator-org/gubernator](https://github.com/gubernator-org/gubernator)

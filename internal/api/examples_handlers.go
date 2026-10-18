@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/examples"
+	"github.com/gubernator-org/gubernator/internal/examples"
 )
 
 // StackServerFilesHandler lists Compose files discovered on the Master server.

@@ -13,8 +13,8 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/mario-ezquerro/gubernator/internal/audit"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/audit"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func setupSIEMTestServer(t *testing.T) *gin.Engine {

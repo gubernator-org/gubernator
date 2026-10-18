@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/monitor"
+	"github.com/gubernator-org/gubernator/internal/monitor"
 )
 
 var monitorCmd = &cobra.Command{

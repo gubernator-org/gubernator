@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // AuthMismatch tracks unauthorized requests from cluster nodes with stale/invalid tokens.

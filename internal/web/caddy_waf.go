@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/caddy"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/caddy"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func caddyWAFConfigHandler(c *gin.Context) {

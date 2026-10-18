@@ -192,4 +192,4 @@ docker compose down -v
 
 ## Source Files
 
-All files are in [`examples/example-sre/`](https://github.com/mario-ezquerro/gubernator/tree/main/examples/example-sre) in the repository.
+All files are in [`examples/example-sre/`](https://github.com/gubernator-org/gubernator/tree/main/examples/example-sre) in the repository.

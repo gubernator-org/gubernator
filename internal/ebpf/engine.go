@@ -375,7 +375,7 @@ func pushSpanToJaeger(f Flow) {
 				"scopeSpans": []map[string]interface{}{
 					{
 						"scope": map[string]interface{}{
-							"name":    "github.com/mario-ezquerro/gubernator/internal/ebpf",
+							"name":    "github.com/gubernator-org/gubernator/internal/ebpf",
 							"version": "v2.79.0",
 						},
 						"spans": []map[string]interface{}{

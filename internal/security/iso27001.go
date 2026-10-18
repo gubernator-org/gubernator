@@ -7,8 +7,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/mario-ezquerro/gubernator/internal/audit"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/audit"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // ISOStandardVersion identifies the targeted version of ISO/IEC 27001.

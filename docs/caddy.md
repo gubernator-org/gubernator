@@ -141,4 +141,4 @@ For full details, architecture, CLI, and API reference, see [Caddy Ingress Threa
 | `/v1/caddy/waf/ip/unblock` | `POST` | Remove IP from Threat Shield blacklist |
 | `/v1/caddy/waf/test` | `POST` | Simulate attack probe and evaluate WAF interception |
 
-For full specification, refer to [`SPEC-caddy.md`](https://github.com/mario-ezquerro/gubernator/blob/main/SPEC-caddy.md) and [`caddy-waf.md`](caddy-waf.md).
+For full specification, refer to [`SPEC-caddy.md`](https://github.com/gubernator-org/gubernator/blob/main/SPEC-caddy.md) and [`caddy-waf.md`](caddy-waf.md).

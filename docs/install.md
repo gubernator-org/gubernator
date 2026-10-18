@@ -10,7 +10,7 @@ Choose your operating system below to download and install the pre-compiled bina
 
 1. Download the latest release:
 ```bash
-curl -LO "https://github.com/mario-ezquerro/gubernator/releases/latest/download/gbnt-linux-amd64"
+curl -LO "https://github.com/gubernator-org/gubernator/releases/latest/download/gbnt-linux-amd64"
 ```
 
 2. Make the `gbnt` binary executable:
@@ -38,7 +38,7 @@ You can download the binary depending on your Mac's processor architecture (Inte
 
 1. Download the binary:
 ```bash
-curl -LO "https://github.com/mario-ezquerro/gubernator/releases/latest/download/gbnt-darwin-arm64"
+curl -LO "https://github.com/gubernator-org/gubernator/releases/latest/download/gbnt-darwin-arm64"
 ```
 
 2. Make it executable and move it to your PATH:
@@ -51,7 +51,7 @@ sudo mv gbnt-darwin-arm64 /usr/local/bin/gbnt
 
 1. Download the binary:
 ```bash
-curl -LO "https://github.com/mario-ezquerro/gubernator/releases/latest/download/gbnt-darwin-amd64"
+curl -LO "https://github.com/gubernator-org/gubernator/releases/latest/download/gbnt-darwin-amd64"
 ```
 
 2. Make it executable and move it to your PATH:
@@ -66,7 +66,7 @@ sudo mv gbnt-darwin-amd64 /usr/local/bin/gbnt
 
 1. Download the latest `.exe` release using PowerShell:
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/mario-ezquerro/gubernator/releases/latest/download/gbnt-windows-amd64.exe" -OutFile "gbnt.exe"
+Invoke-WebRequest -Uri "https://github.com/gubernator-org/gubernator/releases/latest/download/gbnt-windows-amd64.exe" -OutFile "gbnt.exe"
 ```
 
 2. Move the `gbnt.exe` file to a folder of your choice (for example, `C:\Program Files\Gubernator`).
@@ -182,7 +182,7 @@ docker exec -it gbnt-manager /app/gbnt legion info
 If you prefer to compile Gubernator yourself, ensure you have **Go 1.24+** installed. Note that `CGO_ENABLED=1` is required due to the SQLite dependency.
 
 ```bash
-git clone https://github.com/mario-ezquerro/gubernator.git
+git clone https://github.com/gubernator-org/gubernator.git
 cd gubernator
 go build -o gbnt ./cmd/gbnt
 sudo mv gbnt /usr/local/bin/gbnt

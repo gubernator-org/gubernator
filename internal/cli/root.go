@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mario-ezquerro/gubernator/internal/api"
-	"github.com/mario-ezquerro/gubernator/internal/telemetry"
+	"github.com/gubernator-org/gubernator/internal/api"
+	"github.com/gubernator-org/gubernator/internal/telemetry"
 )
 
 var (

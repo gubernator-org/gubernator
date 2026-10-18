@@ -4,7 +4,7 @@ published: true
 description: Run JupyterLab, MLflow, MinIO S3, and Ollama Inference on a lightweight cluster using pure Docker Compose and <2GB RAM.
 tags: devops, machinelearning, docker, ai
 series: MLOps Made Simple
-canonical_url: https://github.com/mario-ezquerro/gubernator
+canonical_url: https://github.com/gubernator-org/gubernator
 ---
 
 # 🛑 The "Kubernetes Tax" on Modern Machine Learning
@@ -25,7 +25,7 @@ Enter **Gubernator (`gbnt`)**: the lightweight "Goldilocks" container orchestrat
 
 ## 🏛️ What is Gubernator?
 
-[Gubernator](https://github.com/mario-ezquerro/gubernator) is a single-binary container orchestrator written in Go that combines:
+[Gubernator](https://github.com/gubernator-org/gubernator) is a single-binary container orchestrator written in Go that combines:
 1. **The simplicity of Docker Swarm** (pure Docker Compose syntax, easy multi-node clustering).
 2. **The power of Nomad** (intelligent task scheduling, worker-first load balancing, and GPU hardware targeting).
 3. **Built-in Aqueducts**: Automatic CoreDNS service discovery + multi-node Caddy Ingress with automatic HTTPS/TLS.
@@ -231,6 +231,6 @@ with mlflow.start_run():
 
 ### 🔗 Project Links
 
-- 🐙 **GitHub Repository**: [mario-ezquerro/gubernator](https://github.com/mario-ezquerro/gubernator)
-- 📖 **Documentation**: [Gubernator Docs](https://github.com/mario-ezquerro/gubernator/tree/main/docs)
+- 🐙 **GitHub Repository**: [gubernator-org/gubernator](https://github.com/gubernator-org/gubernator)
+- 📖 **Documentation**: [Gubernator Docs](https://github.com/gubernator-org/gubernator/tree/main/docs)
 - ⭐ Give it a star on GitHub if you found this useful!

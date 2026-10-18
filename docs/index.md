@@ -41,7 +41,7 @@ Themed around the **Roman Empire**, Gubernator manages containers across a fleet
 
 ```bash
 # 1. Clone and compile
-git clone https://github.com/mario-ezquerro/gubernator.git
+git clone https://github.com/gubernator-org/gubernator.git
 cd gubernator
 go build -o gbnt ./cmd/gbnt
 

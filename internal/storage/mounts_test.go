@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func TestMountsFstabAppendAndRemove(t *testing.T) {

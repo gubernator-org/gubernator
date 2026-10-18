@@ -15,7 +15,7 @@ The stack file `docker-compose.yml` located in `examples/example-wordpress/` def
 ## Prerequisites
 
 - **Docker** running on your local machine.
-- **Go 1.24+** installed (or download the pre-built `gbnt` binary from [Releases](https://github.com/mario-ezquerro/gubernator/releases)).
+- **Go 1.24+** installed (or download the pre-built `gbnt` binary from [Releases](https://github.com/gubernator-org/gubernator/releases)).
 
 ---
 

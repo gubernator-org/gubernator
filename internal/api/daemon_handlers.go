@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/docker"
+	"github.com/gubernator-org/gubernator/internal/docker"
 )
 
 // DockerDaemonGetHandler retrieves the status and configuration of /etc/docker/daemon.json across nodes.

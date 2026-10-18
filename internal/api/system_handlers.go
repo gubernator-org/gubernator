@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/telemetry"
+	"github.com/gubernator-org/gubernator/internal/telemetry"
 )
 
 // SystemAdoptionHandler returns public GitHub adoption stats, release downloads and local cluster metrics.

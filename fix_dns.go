@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mario-ezquerro/gubernator/internal/coredns"
+	"github.com/gubernator-org/gubernator/internal/coredns"
 )
 
 func main() {

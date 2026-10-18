@@ -672,7 +672,7 @@ class _SettingsDialogState extends State<SettingsDialog>
               ),
               const Spacer(),
               InkWell(
-                onTap: () => html.window.open('https://github.com/mario-ezquerro/gubernator/releases', '_blank'),
+                onTap: () => html.window.open('https://github.com/gubernator-org/gubernator/releases', '_blank'),
                 borderRadius: BorderRadius.circular(4),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -715,7 +715,7 @@ class _SettingsDialogState extends State<SettingsDialog>
                     'Published',
                     Icons.verified_outlined,
                     const Color(0xFF10B981),
-                    onTap: () => html.window.open('https://github.com/mario-ezquerro/gubernator/releases', '_blank'),
+                    onTap: () => html.window.open('https://github.com/gubernator-org/gubernator/releases', '_blank'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -738,7 +738,7 @@ class _SettingsDialogState extends State<SettingsDialog>
                     'Community',
                     Icons.star_outline,
                     const Color(0xFFF59E0B),
-                    onTap: () => html.window.open('https://github.com/mario-ezquerro/gubernator', '_blank'),
+                    onTap: () => html.window.open('https://github.com/gubernator-org/gubernator', '_blank'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -750,7 +750,7 @@ class _SettingsDialogState extends State<SettingsDialog>
                     'Clones',
                     Icons.fork_right,
                     const Color(0xFF8B5CF6),
-                    onTap: () => html.window.open('https://github.com/mario-ezquerro/gubernator/forks', '_blank'),
+                    onTap: () => html.window.open('https://github.com/gubernator-org/gubernator/forks', '_blank'),
                   ),
                 ),
               ],
@@ -822,7 +822,7 @@ class _SettingsDialogState extends State<SettingsDialog>
                 Align(
                   alignment: Alignment.centerRight,
                   child: InkWell(
-                    onTap: () => html.window.open('https://github.com/mario-ezquerro/gubernator#telemetry-adoption-metrics--privacy-transparency', '_blank'),
+                    onTap: () => html.window.open('https://github.com/gubernator-org/gubernator#telemetry-adoption-metrics--privacy-transparency', '_blank'),
                     child: const Text(
                       'Read Privacy & Telemetry Section in README ➔',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981), decoration: TextDecoration.underline),

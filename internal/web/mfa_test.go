@@ -13,8 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
-	"github.com/mario-ezquerro/gubernator/internal/auth"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/auth"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func setupWebTestDB(t *testing.T) *gin.Engine {

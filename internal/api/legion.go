@@ -10,12 +10,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
-	"github.com/mario-ezquerro/gubernator/internal/caddy"
-	"github.com/mario-ezquerro/gubernator/internal/coredns"
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/monitor"
-	"github.com/mario-ezquerro/gubernator/internal/nodemanager"
+	"github.com/gubernator-org/gubernator/internal/aqueducts"
+	"github.com/gubernator-org/gubernator/internal/caddy"
+	"github.com/gubernator-org/gubernator/internal/coredns"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/monitor"
+	"github.com/gubernator-org/gubernator/internal/nodemanager"
 )
 
 // JoinRequest represents the payload for joining the cluster

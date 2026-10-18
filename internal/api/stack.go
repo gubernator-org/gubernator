@@ -15,11 +15,11 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 
-	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/examples"
-	"github.com/mario-ezquerro/gubernator/internal/monitor"
-	"github.com/mario-ezquerro/gubernator/internal/slo"
+	"github.com/gubernator-org/gubernator/internal/aqueducts"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/examples"
+	"github.com/gubernator-org/gubernator/internal/monitor"
+	"github.com/gubernator-org/gubernator/internal/slo"
 )
 
 func init() {

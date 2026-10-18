@@ -1,4 +1,4 @@
-module github.com/mario-ezquerro/gubernator
+module github.com/gubernator-org/gubernator
 
 go 1.26.0
 

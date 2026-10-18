@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // LoginResult represents the outcome of an LDAP authentication attempt.

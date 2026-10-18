@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/aqueducts"
-	"github.com/mario-ezquerro/gubernator/internal/db"
-	"github.com/mario-ezquerro/gubernator/internal/docker"
-	"github.com/mario-ezquerro/gubernator/internal/examples"
+	"github.com/gubernator-org/gubernator/internal/aqueducts"
+	"github.com/gubernator-org/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/docker"
+	"github.com/gubernator-org/gubernator/internal/examples"
 )
 
 const localManagerNodeID = "node-local-manager"

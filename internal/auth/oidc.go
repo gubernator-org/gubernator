@@ -20,7 +20,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

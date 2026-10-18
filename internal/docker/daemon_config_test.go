@@ -3,7 +3,7 @@ package docker
 import (
 	"testing"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 func TestBuiltinDaemonPresets(t *testing.T) {

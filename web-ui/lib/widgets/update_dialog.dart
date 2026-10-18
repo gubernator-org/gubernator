@@ -936,7 +936,7 @@ class _VersionCheckModalState extends State<VersionCheckModal> {
     final updateAvailable = _updateInfo?['update_available'] == true;
     final latestVersion = _updateInfo?['latest_version'] as String? ?? widget.currentVersion;
     final releaseNotes = _updateInfo?['release_notes'] as String? ?? '';
-    final releaseUrl = _updateInfo?['release_url'] as String? ?? 'https://github.com/mario-ezquerro/gubernator/releases';
+    final releaseUrl = _updateInfo?['release_url'] as String? ?? 'https://github.com/gubernator-org/gubernator/releases';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

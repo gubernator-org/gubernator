@@ -1,8 +1,9 @@
 site_name: Gubernator Orchestrator
+site_url: https://gubernator-org.github.io/gubernator/
 site_description: A lightweight, hybrid container orchestrator built in Go — simplicity of Swarm, flexibility of Nomad.
 site_author: Mario Ezquerro
-repo_url: https://github.com/mario-ezquerro/gubernator
-repo_name: mario-ezquerro/gubernator
+repo_url: https://github.com/gubernator-org/gubernator
+repo_name: gubernator-org/gubernator
 
 theme:
   name: material

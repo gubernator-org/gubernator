@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mario-ezquerro/gubernator/internal/coredns"
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/coredns"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // aqueductMutex protects concurrent access to file generation and database queries

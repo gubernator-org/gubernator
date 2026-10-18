@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mario-ezquerro/gubernator/internal/db"
+	"github.com/gubernator-org/gubernator/internal/db"
 )
 
 // GlusterPeer represents a node in the GlusterFS trusted storage pool.
