@@ -586,7 +586,7 @@ The Gubernator Web Dashboard features a dedicated **Compose Studio** (`/#/studio
 | **Caddy Health** | `gbnt.caddy.health_timeout: <dur>` | `1s`, `2s`, `5s` | `2s` | Active probe timeout before marking node down. |
 | **WAF** | `gbnt.waf.enabled: <bool>` | `true`, `false` | `false` | Coraza Web Application Firewall protection. |
 | **WAF** | `gbnt.waf.mode: <mode>` | `enforce`, `detection` | `enforce` | Action mode for detected web attack vectors. |
-| **Placement** | `gbnt.placement.strategy: <strat>` | `spread`, `single-host` | `spread` | Multi-host spread vs single-node atomic placement. |
+| **Placement** | `gbnt.placement.strategy: <start>` | `spread`, `single-host` | `spread` | Multi-host spread vs single-node atomic placement. |
 | **Placement** | `deploy.placement.preferences: spread: node.id` | N/A | None | Distributes replicas across distinct Centurion hosts. |
 | **Placement** | `deploy.placement.constraints: node.role == worker` | `worker`, `manager` | None | Restricts container execution to specific node roles. |
 | **Hardware** | `deploy.placement.constraints: gbnt.node.gpu == nvidia` | `nvidia` | None | Restricts container scheduling to GPU-equipped Centurions. |

@@ -191,4 +191,3 @@ func CoreDNSPingHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, res)
 }
-

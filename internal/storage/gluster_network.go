@@ -39,14 +39,14 @@ type NodeNetworkInterface struct {
 
 // NodeStorageNetworkInfo represents the network interfaces and storage traffic for a single Centurion node.
 type NodeStorageNetworkInfo struct {
-	NodeID     string                    `json:"node_id"`
-	NodeRole   string                    `json:"node_role"`
-	HostIP     string                    `json:"host_ip"`
-	StorageIP  string                    `json:"storage_ip"`
-	StorageDNS string                    `json:"storage_dns"`
-	StorageNIC string                    `json:"storage_nic"`
+	NodeID     string                 `json:"node_id"`
+	NodeRole   string                 `json:"node_role"`
+	HostIP     string                 `json:"host_ip"`
+	StorageIP  string                 `json:"storage_ip"`
+	StorageDNS string                 `json:"storage_dns"`
+	StorageNIC string                 `json:"storage_nic"`
 	Interfaces []NodeNetworkInterface `json:"interfaces"`
-	IsOnline   bool                      `json:"is_online"`
+	IsOnline   bool                   `json:"is_online"`
 }
 
 // ClusterStorageNetworkReport contains cluster-wide storage traffic and Dual-NIC topology.

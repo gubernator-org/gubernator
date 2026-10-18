@@ -26,13 +26,13 @@ type LoginResult struct {
 
 // TestResult represents the diagnostics of testing an LDAP configuration.
 type TestResult struct {
-	Connected      bool        `json:"connected"`
-	TLSActive      bool        `json:"tls_active"`
-	BindSuccessful bool        `json:"bind_successful"`
-	UserFound      bool        `json:"user_found"`
-	LoginResult     *LoginResult `json:"auth_result,omitempty"`
-	Message        string      `json:"message"`
-	LatencyMs      int64       `json:"latency_ms"`
+	Connected      bool         `json:"connected"`
+	TLSActive      bool         `json:"tls_active"`
+	BindSuccessful bool         `json:"bind_successful"`
+	UserFound      bool         `json:"user_found"`
+	LoginResult    *LoginResult `json:"auth_result,omitempty"`
+	Message        string       `json:"message"`
+	LatencyMs      int64        `json:"latency_ms"`
 }
 
 // ConnectLDAP opens a connection to the specified LDAP server.

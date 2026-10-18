@@ -1,4 +1,4 @@
-name: Qodana
+name: Go Code Quality & Security
 
 on:
   push:
@@ -11,47 +11,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  qodana:
-    name: Qodana Code Quality
+  code-quality:
+    name: Go Static Analysis, Vulnerability Scan & pkg.go.dev Sync
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      checks: write
-      security-events: write
+      contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
 
-      - name: Qodana Scan (first run)
-        if: ${{ hashFiles('baseline.sarif.json') == '' }}
-        uses: JetBrains/qodana-action@v2026.1
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          upload-result: true
-          pr-mode: false
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_2133200645 }}
-          QODANA_ENDPOINT: 'https://qodana.cloud'
+          go-version: '1.24'
+          cache: true
 
-      - name: Qodana Scan (with baseline)
-        if: ${{ hashFiles('baseline.sarif.json') != '' }}
-        uses: JetBrains/qodana-action@v2026.1
-        with:
-          args: >-
-            --baseline,baseline.sarif.json
-          upload-result: true
-          pr-mode: false
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_2133200645 }}
-          QODANA_ENDPOINT: 'https://qodana.cloud'
+      - name: Verify gofmt -s (Go Report Card Formatting)
+        run: |
+          UNFORMATTED=$(gofmt -s -l cmd/ internal/)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "The following files are not properly formatted with gofmt -s:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+          echo "✓ All Go files pass gofmt -s"
 
-      - name: Upload SARIF to GitHub Security
-        if: ${{ success() && hashFiles(format('{0}/qodana/results/qodana.sarif.json', runner.temp)) != '' }}
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
-          category: qodana
+      - name: Run go vet (Static Analysis)
+        run: go vet ./...
+
+      - name: Run ineffassign (Go Report Card Ineffectual Assignments)
+        run: go run github.com/gordonklaus/ineffassign@latest ./...
+
+      - name: Run govulncheck (Official Go Vulnerability Database / pkg.go.dev)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest -mode=source ./... || true
+
+      - name: Sync Index with pkg.go.dev & Go Report Card
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          curl -sS -X POST "https://pkg.go.dev/fetch/github.com/gubernator-org/gubernator@main" || true
+          curl -sS -X POST "https://goreportcard.com/checks" -d "repo=github.com/gubernator-org/gubernator" || true

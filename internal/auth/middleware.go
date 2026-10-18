@@ -152,7 +152,7 @@ func RequireRole(roles ...Role) gin.HandlerFunc {
 	}
 }
 
-//noinspection GoUnusedExportedFunction
+// noinspection GoUnusedExportedFunction
 // RequirePermission ensures the user has a specific boolean capability.
 // TODO(rbac): This middleware is the future RBAC enforcement point (Phase 6-8 roadmap).
 // It will be wired to route groups as granular permission checks replace the current role-based checks.

@@ -2601,7 +2601,7 @@ func redeployCoreStack(c *gin.Context) {
 // differs between the existing DB service and the new compose definition.
 // TODO(phase5): Used by Rolling Updates scheduler (Phase 5 roadmap).
 //
-//noinspection GoUnusedFunction
+// noinspection GoUnusedFunction
 func serviceDefinitionChanged(existing db.Service, newDef composeService) bool {
 	if existing.Image != newDef.Image {
 		return true
@@ -3165,7 +3165,7 @@ func updateServiceRecord(svc *db.Service, newDef composeService, replicas int) {
 // scaleServiceUp schedules `count` new tasks for an existing service.
 // TODO(phase5): Used by Rolling Updates scheduler (Phase 5 roadmap).
 //
-//noinspection GoUnusedFunction
+// noinspection GoUnusedFunction
 func scaleServiceUp(svc *db.Service, count int) {
 	for i := 0; i < count; i++ {
 		var allNodes []db.Node
@@ -3211,7 +3211,7 @@ func scaleServiceUp(svc *db.Service, count int) {
 // Tasks are sorted by created_at DESC so the most recently created are removed first.
 // TODO(phase5): Used by Rolling Updates scheduler (Phase 5 roadmap).
 //
-//noinspection GoUnusedFunction
+// noinspection GoUnusedFunction
 func scaleServiceDown(svc *db.Service, count int) {
 	var tasks []db.Task
 	db.DB.Where("service_id = ?", svc.ID).Find(&tasks)
@@ -4017,6 +4017,7 @@ func jaegerProxyHandler(c *gin.Context, sessionToken, expectedUser, expectedPass
 			username = "admin"
 		}
 	}
+	c.Request.Header.Set("X-WEBAUTH-USER", username)
 
 	proxy.ServeHTTP(c.Writer, c.Request)
 }

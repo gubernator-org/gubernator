@@ -443,7 +443,7 @@ func SimulateThreat(targetHost string, attackVector string) (*db.WAFSecurityEven
 		vector = "SQLI"
 	}
 
-	testURI := "/"
+	var testURI string
 	testHeaders := make(http.Header)
 	testHeaders.Set("Host", cleanHost)
 

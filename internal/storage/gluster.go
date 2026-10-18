@@ -120,7 +120,7 @@ var (
 	glusterMu sync.Mutex
 )
 
-//noinspection GoUnusedExportedFunction
+// noinspection GoUnusedExportedFunction
 // InitGlusterDB initializes table migrations for managed gluster volumes.
 func InitGlusterDB() {
 	if db.DB != nil {

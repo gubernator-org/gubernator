@@ -4,16 +4,18 @@
 [![Docker Image](https://img.shields.io/docker/v/cloudresources/gubernator?style=flat-square&color=blue&logo=docker)](https://hub.docker.com/repository/docker/cloudresources/gubernator/general)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/blob/main/go.mod)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gubernator-org/gubernator?style=flat-square)](https://goreportcard.com/report/github.com/gubernator-org/gubernator)
+[![Code Quality](https://img.shields.io/github/actions/workflow/status/gubernator-org/gubernator/qodana_code_quality.yml?branch=main&label=code%20quality&style=flat-square)](https://github.com/gubernator-org/gubernator/actions/workflows/qodana_code_quality.yml)
 [![License](https://img.shields.io/github/license/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/blob/main/LICENSE)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/gubernator-org/gubernator/test.yml?branch=main&style=flat-square)](https://github.com/gubernator-org/gubernator/actions/workflows/test.yml)
 [![Documentation](https://img.shields.io/badge/docs-MkDocs-blue?style=flat-square)](https://gubernator-org.github.io/gubernator/)
+[![Manual ES](https://img.shields.io/badge/manual-Espa%C3%B1ol%20(v3.2.6)-orange?style=flat-square)](manual-gubernator-v3.2.6.md)
 [![GitHub issues](https://img.shields.io/github/issues/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/issues)
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/pulls)
 [![GitHub stars](https://img.shields.io/github/stars/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/network)
 [![Docker Pulls](https://img.shields.io/docker/pulls/cloudresources/gubernator?style=flat-square&logo=docker)](https://hub.docker.com/r/cloudresources/gubernator)
 [![Docker Image Size](https://img.shields.io/docker/image-size/cloudresources/gubernator/latest?style=flat-square&color=blue&logo=docker)](https://hub.docker.com/r/cloudresources/gubernator)
-[![Go Reference](https://img.shields.io/badge/go-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/gubernator-org/gubernator)
+[![Go Reference](https://img.shields.io/badge/go-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/gubernator-org/gubernator@main)
 [![GitHub contributors](https://img.shields.io/github/contributors/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/graphs/contributors)
 [![GitHub repo size](https://img.shields.io/github/repo-size/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator)
 [![GitHub last commit](https://img.shields.io/github/last-commit/gubernator-org/gubernator?style=flat-square)](https://github.com/gubernator-org/gubernator/commits/main)
@@ -583,11 +585,24 @@ Gubernator values **openness, privacy, and full transparency**. You can view liv
 
 ---
 
+## 🔍 Go Code Quality, `pkg.go.dev` & Static Analysis Pipeline
+
+Gubernator enforces continuous Go code quality, vulnerability auditing, and documentation indexing across two public platforms and an automated GitHub Actions pipeline ([`.github/workflows/qodana_code_quality.yml`](.github/workflows/qodana_code_quality.yml)):
+
+| Platform / Check | URL / Command | Purpose |
+| :--- | :--- | :--- |
+| **Go Package Discovery (`pkg.go.dev`)** | [`pkg.go.dev/github.com/gubernator-org/gubernator@main`](https://pkg.go.dev/github.com/gubernator-org/gubernator@main) | Official Go module documentation (`godoc`), open-source license verification (`MIT`), dependency graph, and [`vuln.go.dev`](https://vuln.go.dev/) advisory tracking. |
+| **Go Report Card (`goreportcard.com`)** | [`goreportcard.com/report/github.com/gubernator-org/gubernator`](https://goreportcard.com/report/github.com/gubernator-org/gubernator) | Automated A+ code quality grading across `gofmt -s`, `go vet`, `gocyclo`, `ineffassign`, `misspell`, and `golint`. |
+| **Formatting Simplification** | `gofmt -s -w cmd/ internal/` | Enforces canonical simplified AST formatting across all Go packages. |
+| **Static Analysis & Ineffectual Assignments** | `go vet ./... && go run github.com/gordonklaus/ineffassign@latest ./...` | Detects suspicious constructs, concurrency locks, and unused variable assignments on every commit. |
+| **Go Vulnerability Scanner** | `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` | Audits source call stacks against the official Go Vulnerability Database. |
+
+> 📘 **Manual Oficial en Español (con capturas reales en vivo de clúster de 2 nodos):** Consulta **[`manual-gubernator-v3.2.6.md`](manual-gubernator-v3.2.6.md)**.
+
+---
+
 ## 🗺 Current Roadmap State
 
 Gubernator's development is divided into "Campaigns". We've completed up to **Phase 46**, including full CLI parity, Native Docker Engine execution, CoreDNS/Caddy Ingress Automation, Asymmetric Port Security, Flutter Web Dashboard, built-in SRE Monitoring Stack, Google SRE Sloth SLO Engine, Enterprise Active Directory / LDAP Authentication + RBAC (`v2.20.0`), Dedicated Loki Logs Explorer (`v2.21.0`), Multi-Distro Ansible Automation (`v2.22.0`), Multi-Cloud Terraform Suite (`v2.23.0`), Persistent Storage & Backups ("The Granaries") (`v2.24.0`), Image Security, SBOM & Cosign Signing ("The Imperial Seal") (`v2.25.0`), Dedicated Compose Studio & Copilot (`v2.27.0`), Network Mounts & `/etc/fstab` Management (`v2.28.0`), Transparent Adoption Metrics & Privacy (`v2.29.0`), GlusterFS Cluster Storage Subsystem (`v2.30.0`), Host & Cluster Disk Monitoring (`v2.31.0`), Streamlined Host-Qualified DNS (`v2.58.2`), Dynamic & Customizable Enterprise Cluster Base Domain (`v2.59.0`), and Compose Studio Persistent Selection & Infallible Hardware Key Engine (`v2.59.3`).
 
 **[View the complete Roadmap and completed features here](https://gubernator-org.github.io/gubernator/roadmap/)**
-
-
-

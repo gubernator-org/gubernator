@@ -30,7 +30,7 @@ var scanCmd = &cobra.Command{
 			defer func() { _ = resp.Body.Close() }()
 
 			var data struct {
-				Scans   []db.ImageScan            `json:"scans"`
+				Scans   []db.ImageScan        `json:"scans"`
 				Summary *security.ScanSummary `json:"summary"`
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {

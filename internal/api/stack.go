@@ -204,11 +204,11 @@ type ComposeService struct {
 	Ports          []string          `yaml:"ports"`       // e.g. ["8080:80"]
 	Environment    EnvSlice          `yaml:"environment"` // handles both list and map formats
 	EnvMap         map[string]string `yaml:"environment_map,omitempty"`
-	Volumes        []string          `yaml:"volumes"` // e.g. ["./data:/app/data"]
-	DNS            StringOrSlice     `yaml:"dns"`     // e.g. ["192.168.252.39"] or "192.168.252.39"
+	Volumes        []string          `yaml:"volumes"`    // e.g. ["./data:/app/data"]
+	DNS            StringOrSlice     `yaml:"dns"`        // e.g. ["192.168.252.39"] or "192.168.252.39"
 	DnsSearch      StringOrSlice     `yaml:"dns_search"` // e.g. ["gbnt.local"]
-	Command        CommandVal        `yaml:"command"` // handles both string and list formats
-	Labels         LabelsMap         `yaml:"labels"`  // handles service labels (e.g. gbnt.slo.*)
+	Command        CommandVal        `yaml:"command"`    // handles both string and list formats
+	Labels         LabelsMap         `yaml:"labels"`     // handles service labels (e.g. gbnt.slo.*)
 	Cpus           FlexString        `yaml:"cpus"`
 	MemLimit       FlexString        `yaml:"mem_limit"`
 	MemReservation FlexString        `yaml:"mem_reservation"`

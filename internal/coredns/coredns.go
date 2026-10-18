@@ -189,7 +189,7 @@ func defaultCorefile() string {
 	return DefaultCorefile()
 }
 
-//noinspection GoUnusedExportedFunction
+// noinspection GoUnusedExportedFunction
 // EnsureRunningWorker starts the CoreDNS container in worker mode (forwarding cluster domains to the manager).
 func EnsureRunningWorker(managerIP string) error {
 	dir := LocalConfigDir()

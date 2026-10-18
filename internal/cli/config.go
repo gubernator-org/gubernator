@@ -179,7 +179,7 @@ func saveConfig(cfg ContextConfig) {
 	_ = os.WriteFile(configPath(), data, 0600)
 }
 
-//noinspection GoUnusedExportedFunction
+// noinspection GoUnusedExportedFunction
 // GetAPIEndpoint returns the server URL from the current context without a trailing slash.
 func GetAPIEndpoint() string {
 	cfg := loadConfig()

@@ -536,4 +536,3 @@ func EnsureDefaultAdminUser() {
 	}
 	seedInitialLocalUser()
 }
-
