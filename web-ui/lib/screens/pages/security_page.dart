@@ -16,11 +16,13 @@ part 'security/security_iso_dora_part.dart';
 class SecurityPage extends StatefulWidget {
   final DashboardState state;
   final VoidCallback onRefresh;
+  final int selectedSubIndex;
 
   const SecurityPage({
     super.key,
     required this.state,
     required this.onRefresh,
+    this.selectedSubIndex = 0,
   });
 
   @override
@@ -108,7 +110,11 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: widget.selectedSubIndex.clamp(0, 4),
+    );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging && mounted) {
         if (_tabController.index == 0 && _localUsers.isEmpty && !_usersLoading) {
@@ -126,6 +132,17 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
       }
     });
     _loadAllData();
+  }
+
+  @override
+  void didUpdateWidget(SecurityPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
+      final target = widget.selectedSubIndex.clamp(0, 4);
+      if (_tabController.index != target) {
+        _tabController.animateTo(target);
+      }
+    }
   }
 
   @override
@@ -530,34 +547,12 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
             ),
             const SizedBox(height: 20),
 
-            // Tab Bar Navigation
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.2)),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                indicatorSize: TabBarIndicatorSize.tab,
-                labelColor: primaryColor,
-                unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                tabs: const [
-                  Tab(icon: Icon(Icons.people_alt_outlined), text: "Local Users & MFA"),
-                  Tab(icon: Icon(Icons.dns_outlined), text: "Active Directory / LDAP"),
-                  Tab(icon: Icon(Icons.vpn_key_outlined), text: "SSO / OIDC"),
-                  Tab(icon: Icon(Icons.security_update_good), text: "Forensic Audit & SIEM"),
-                  Tab(icon: Icon(Icons.verified_user_outlined), text: "Compliance & Regulatory Suite"),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Tab Views Container
+            // Tab Views Container (controlled via Level-3 Sidebar Navigation)
             SizedBox(
               height: 980,
               child: TabBarView(
                 controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildLocalUsersTab(isDark, primaryColor),
                   _buildLDAPTab(isDark, primaryColor),

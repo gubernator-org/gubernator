@@ -12,7 +12,9 @@ part 'ebpf/ebpf_dialogs_part.dart';
 /// Dedicated eBPF Live Hub Page for Kernel Network Observability,
 /// L4/L7 Flow Tracing, and Service Mesh Topology.
 class EbpfPage extends StatefulWidget {
-  const EbpfPage({super.key});
+  final int selectedSubIndex;
+
+  const EbpfPage({super.key, this.selectedSubIndex = 0});
 
   @override
   State<EbpfPage> createState() => _EbpfPageState();
@@ -54,7 +56,11 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.selectedSubIndex.clamp(0, 2),
+    );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging && mounted) {
         setState(() {});
@@ -63,6 +69,17 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
     });
     _loadAllData();
     _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(EbpfPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
+      final target = widget.selectedSubIndex.clamp(0, 2);
+      if (_tabController.index != target) {
+        _tabController.animateTo(target);
+      }
+    }
   }
 
   @override
@@ -216,78 +233,13 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
           // ── Top Header Toolbar ─────────────────────────────────────────
           _buildHeaderToolbar(theme),
 
-          // ── Navigation Tabs ────────────────────────────────────────────
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(bottom: BorderSide(color: theme.dividerColor)),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              labelColor: const Color(0xFF06B6D4),
-              unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              indicatorColor: const Color(0xFF06B6D4),
-              indicatorWeight: 3,
-              tabs: [
-                Tab(
-                  icon: const Icon(Icons.swap_calls, size: 18),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Live Captured Flows'),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${_flows.length}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF06B6D4)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Tab(
-                  icon: const Icon(Icons.hub, size: 18),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Service Mesh Topology'),
-                      if (_topology != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${_topology!.nodes.length} Nodes',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const Tab(
-                  icon: Icon(Icons.memory, size: 18),
-                  text: 'Kernel Probes & Diagnostics',
-                ),
-              ],
-            ),
-          ),
-
-          // ── Tab Views ──────────────────────────────────────────────────
+          // ── Tab Views (controlled via Level-3 Sidebar Navigation) ──────
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
                 : TabBarView(
                     controller: _tabController,
+                    physics: const NeverScrollableScrollPhysics(),
                     children: [
                       _buildFlowsTab(theme),
                       _buildTopologyTab(theme),

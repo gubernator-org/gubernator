@@ -10,11 +10,13 @@ part 'slo/slo_dialogs_part.dart';
 class SloPage extends StatefulWidget {
   final DashboardState state;
   final VoidCallback onRefresh;
+  final int selectedSubIndex;
 
   const SloPage({
     super.key,
     required this.state,
     required this.onRefresh,
+    this.selectedSubIndex = 0,
   });
 
   @override
@@ -59,8 +61,23 @@ services:
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: widget.selectedSubIndex.clamp(0, 4),
+    );
     _loadData();
+  }
+
+  @override
+  void didUpdateWidget(SloPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
+      final target = widget.selectedSubIndex.clamp(0, 4);
+      if (_tabController.index != target) {
+        _tabController.animateTo(target);
+      }
+    }
   }
 
   @override
@@ -313,18 +330,6 @@ services:
           ),
           const SizedBox(height: 20),
           _buildSummaryCards(theme),
-          const SizedBox(height: 20),
-          TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabs: const [
-              Tab(icon: Icon(Icons.speed, size: 18), text: 'Overview & Budgets'),
-              Tab(icon: Icon(Icons.route, size: 18), text: 'User Journeys'),
-              Tab(icon: Icon(Icons.timeline, size: 18), text: 'Deployment Correlation'),
-              Tab(icon: Icon(Icons.dashboard_customize, size: 18), text: 'SLI Templates'),
-              Tab(icon: Icon(Icons.science, size: 18), text: 'Backtest & Validator'),
-            ],
-          ),
           const SizedBox(height: 20),
           if (_loading)
             const Center(child: Padding(padding: EdgeInsets.all(48), child: CircularProgressIndicator()))

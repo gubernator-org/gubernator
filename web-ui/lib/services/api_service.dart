@@ -63,6 +63,50 @@ class ApiService {
   /// Redeploys a stack.
   static Future<bool> redeployStack(String id) => ClusterApi.redeployStack(id);
 
+  /// Discovers unmanaged Docker containers across all cluster nodes.
+  static Future<Map<String, dynamic>> fetchUnmanagedContainers() =>
+      ClusterApi.fetchUnmanagedContainers();
+
+  /// Reverse-engineers a docker-compose.yml from docker inspect or host compose file.
+  static Future<Map<String, dynamic>> generateUnmanagedCompose({
+    required String nodeId,
+    required List<String> containerNames,
+    String? stackName,
+    bool preferHostFile = false,
+  }) =>
+      ClusterApi.generateUnmanagedCompose(
+        nodeId: nodeId,
+        containerNames: containerNames,
+        stackName: stackName,
+        preferHostFile: preferHostFile,
+      );
+
+  /// Adopts unmanaged containers as a managed Gubernator Stack (Zero-Downtime).
+  static Future<Map<String, dynamic>> adoptUnmanagedStack({
+    required String stackName,
+    required String nodeId,
+    required List<String> containerNames,
+    required String composeYaml,
+  }) =>
+      ClusterApi.adoptUnmanagedStack(
+        stackName: stackName,
+        nodeId: nodeId,
+        containerNames: containerNames,
+        composeYaml: composeYaml,
+      );
+
+  /// Executes a lifecycle action (start, stop, restart, rm) on an unmanaged container.
+  static Future<void> unmanagedContainerAction({
+    required String nodeId,
+    required String containerName,
+    required String action,
+  }) =>
+      ClusterApi.unmanagedContainerAction(
+        nodeId: nodeId,
+        containerName: containerName,
+        action: action,
+      );
+
   /// Restarts all containers in a stack.
   static Future<bool> restartStack(String id) => ClusterApi.restartStack(id);
 

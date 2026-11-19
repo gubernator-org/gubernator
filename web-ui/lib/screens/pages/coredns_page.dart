@@ -13,10 +13,13 @@ class CoreDnsPage extends StatefulWidget {
   final DashboardState state;
   final VoidCallback onRefresh;
 
+  final int selectedSubIndex;
+
   const CoreDnsPage({
     super.key,
     required this.state,
     required this.onRefresh,
+    this.selectedSubIndex = 0,
   });
 
   @override
@@ -55,9 +58,27 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    final initial = widget.selectedSubIndex.clamp(0, 3);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: initial);
     _configController.addListener(_onConfigTextChange);
     _loadSuiteData();
+    if (initial == 3) {
+      _loadConfig();
+    }
+  }
+
+  @override
+  void didUpdateWidget(CoreDnsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
+      final target = widget.selectedSubIndex.clamp(0, 3);
+      if (_tabController.index != target) {
+        _tabController.animateTo(target);
+      }
+      if (target == 3 && _configController.text.isEmpty) {
+        _loadConfig();
+      }
+    }
   }
 
   @override
@@ -388,22 +409,6 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
           ),
           const SizedBox(height: 20),
           _buildSummaryCards(theme),
-          const SizedBox(height: 20),
-          TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            onTap: (idx) {
-              if (idx == 3 && _configController.text.isEmpty) {
-                _loadConfig();
-              }
-            },
-            tabs: const [
-              Tab(icon: Icon(Icons.lan, size: 18), text: 'Auto-Discovered (*.gbnt)'),
-              Tab(icon: Icon(Icons.edit_note, size: 18), text: 'Custom Static Records'),
-              Tab(icon: Icon(Icons.play_arrow, size: 18), text: 'DNS Playground (Dig)'),
-              Tab(icon: Icon(Icons.settings, size: 18), text: 'Upstream & Corefile'),
-            ],
-          ),
           const SizedBox(height: 20),
           if (_loadingData)
             const Center(child: Padding(padding: EdgeInsets.all(48), child: CircularProgressIndicator()))

@@ -17,13 +17,16 @@ import '../../widgets/common_widgets.dart';
 
 part 'legions/legions_actions_dialogs_part.dart';
 part 'legions/stack_diagnostics_dialog_part.dart';
+part 'legions/legions_unmanaged_part.dart';
 
-/// Legions page — full-width stacks table with all actions.
+/// Legions page — full-width stacks table with all actions + Unmanaged discovery/adoption.
 class LegionsPage extends StatefulWidget {
   final DashboardState state;
   final VoidCallback onRefresh;
   final ValueChanged<String>? onViewContainerLogs;
   final ValueChanged<String>? onViewStackContainers;
+  final int selectedSubIndex;
+  final VoidCallback? onSwitchToManaged;
 
   const LegionsPage({
     super.key,
@@ -31,6 +34,8 @@ class LegionsPage extends StatefulWidget {
     required this.onRefresh,
     this.onViewContainerLogs,
     this.onViewStackContainers,
+    this.selectedSubIndex = 0,
+    this.onSwitchToManaged,
   });
 
   @override
@@ -46,6 +51,24 @@ class _LegionsPageState extends State<LegionsPage> {
   final ScrollController _verticalScrollController = ScrollController();
   final Set<String> _processingStackIds = {};
   final Set<String> _expandedStackIds = {};
+
+  // Unmanaged / Discovered Containers state (selectedSubIndex == 1)
+  List<Map<String, dynamic>> _unmanagedGroups = [];
+  List<Map<String, dynamic>> _unmanagedContainers = [];
+  Map<String, String> _unmanagedNodeErrors = {};
+  bool _loadingUnmanaged = false;
+  bool _unmanagedLoadedOnce = false;
+  String? _unmanagedError;
+  String _unmanagedSearch = '';
+  String _unmanagedNodeFilter = 'ALL';
+  final Set<String> _selectedUnmanagedKeys = {};
+  final Set<String> _processingUnmanagedKeys = {};
+
+  void _setStateSafe(VoidCallback fn) {
+    if (mounted) {
+      setState(fn);
+    }
+  }
 
   bool _isBaseStack(StackModel s) {
     final id = s.id.toLowerCase();
@@ -227,6 +250,9 @@ class _LegionsPageState extends State<LegionsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (widget.selectedSubIndex == 1) {
+      return _buildUnmanagedView(theme, theme.brightness == Brightness.dark);
+    }
     final allMatching = widget.state.stacks.where((s) {
       if (_searchQuery.isEmpty) return true;
       return s.id.toLowerCase().contains(_searchQuery) ||

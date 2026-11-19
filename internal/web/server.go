@@ -583,6 +583,11 @@ func StartDashboard() {
 		api.POST("/stack/save", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), saveStackHandler)
 		api.POST("/stacks/server-save", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), stackServerSaveWebHandler)
 		api.POST("/stacks/server-deploy", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), stackServerDeployWebHandler)
+		// Unmanaged / Brownfield Container Discovery & Stack Adoption
+		api.GET("/unmanaged", unmanagedListHandler)
+		api.POST("/unmanaged/generate-compose", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), unmanagedGenerateComposeHandler)
+		api.POST("/unmanaged/adopt", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), unmanagedAdoptHandler)
+		api.POST("/unmanaged/action", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), unmanagedActionHandler)
 		api.POST("/examples/deploy", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), exampleDeployWebHandler)
 		api.DELETE("/stack/:id", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), deleteStackHandler)
 		api.POST("/stack/:id/migrate", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), migrateStackHandler)

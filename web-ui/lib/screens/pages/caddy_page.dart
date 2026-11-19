@@ -14,11 +14,13 @@ part 'caddy/caddy_waf_part.dart';
 class CaddyPage extends StatefulWidget {
   final DashboardState state;
   final VoidCallback onRefresh;
+  final int selectedSubIndex;
 
   const CaddyPage({
     super.key,
     required this.state,
     required this.onRefresh,
+    this.selectedSubIndex = 0,
   });
 
   @override
@@ -74,8 +76,23 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(
+      length: 8,
+      vsync: this,
+      initialIndex: widget.selectedSubIndex.clamp(0, 7),
+    );
     _loadCaddyData();
+  }
+
+  @override
+  void didUpdateWidget(CaddyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
+      final target = widget.selectedSubIndex.clamp(0, 7);
+      if (_tabController.index != target) {
+        _tabController.animateTo(target);
+      }
+    }
   }
 
   @override
@@ -159,7 +176,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Caddy Ingress Visualization Suite',
+                        Text('Load Balancing & Ingress Suite',
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 2),
                         Text('Multi-node reverse proxy gateway, route matrix, certificates, logs & metrics',
@@ -208,36 +225,11 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
           ),
           const SizedBox(height: 14),
 
-          // Sub-Tab Navigation Bar
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.grey[200],
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              indicatorColor: const Color(0xFFF97316),
-              labelColor: const Color(0xFFF97316),
-              unselectedLabelColor: isDark ? Colors.grey[400] : Colors.grey[700],
-              tabs: const [
-                Tab(icon: Icon(Icons.dashboard, size: 18), text: 'Dashboard'),
-                Tab(icon: Icon(Icons.fork_right, size: 18), text: 'Routes'),
-                Tab(icon: Icon(Icons.description, size: 18), text: 'Caddyfile'),
-                Tab(icon: Icon(Icons.lock, size: 18), text: 'TLS Certs'),
-                Tab(icon: Icon(Icons.receipt_long, size: 18), text: 'Access Logs'),
-                Tab(icon: Icon(Icons.tune, size: 18), text: 'Log Config'),
-                Tab(icon: Icon(Icons.show_chart, size: 18), text: 'Metrics'),
-                Tab(icon: Icon(Icons.security, size: 18), text: 'WAF & Threat Shield'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Tab Views
+          // Tab Views (controlled via Level-3 Sidebar Navigation)
           Expanded(
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildDashboardTab(selectedNode, status, theme, isDark),
                 _buildRoutesTab(theme, isDark),

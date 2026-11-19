@@ -62,18 +62,34 @@ class _AppShellState extends State<AppShell> {
   DateTime? _lastRefresh;
   Timer? _timer;
   int _selectedIndex = 0;
+  int _selectedSubIndex = 0;
+  final Map<int, int> _lastSubIndexByPage = {};
   String? _lokiFilterContainer;
   String? _tasksFilterStack;
   bool _sidebarCollapsed = false;
+  Set<String> _collapsedSections = {};
+  Set<int> _expandedItems = {};
   bool _fetching = false;
   bool _hasPromptedUpdate = false;
+
+  static const String _collapsedSectionsStorageKey =
+      'gbnt_sidebar_collapsed_sections';
+  static const String _expandedItemsStorageKey =
+      'gbnt_sidebar_expanded_items';
+  static const List<String> _allSectionIds = [
+    'cluster',
+    'infrastructure',
+    'observability',
+    'network',
+    'security',
+  ];
+  static const Set<int> _pagesWithSubItems = {2, 4, 5, 6, 7, 8, 14, 15};
 
   // Cached singleton instances for platform-view / iframe pages to eliminate DOM re-creation
   late final Widget _grafanaPage = const GrafanaPage(key: ValueKey('page-grafana-singleton'));
   late final Widget _networkPage = const NetworkPage(key: ValueKey('page-network-singleton'));
   late final Widget _jaegerPage = const JaegerPage(key: ValueKey('page-jaeger-singleton'));
   late final Widget _scopePage = const ScopePage(key: ValueKey('page-scope-singleton'));
-  late final Widget _ebpfPage = const EbpfPage(key: ValueKey('page-ebpf-singleton'));
 
   Duration get _pageTransitionDuration {
     // If the active page embeds an iframe/platform view, skip cross-fade animation to eliminate GPU recomposition flicker
@@ -86,6 +102,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    _loadCollapsedSections();
     clearGrafanaStaleCookies();
     ApiService.sendTimeBeacon();
     _fetchData();
@@ -94,6 +111,133 @@ class _AppShellState extends State<AppShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (MediaQuery.of(context).size.width < 1200) {
         setState(() => _sidebarCollapsed = true);
+      }
+    });
+  }
+
+  void _loadCollapsedSections() {
+    try {
+      final raw = html.window.localStorage[_collapsedSectionsStorageKey];
+      if (raw != null && raw.trim().isNotEmpty) {
+        final validIds = _allSectionIds.toSet();
+        _collapsedSections = raw
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => validIds.contains(e))
+            .toSet();
+      }
+    } catch (_) {}
+    try {
+      final rawItems = html.window.localStorage[_expandedItemsStorageKey];
+      if (rawItems != null && rawItems.trim().isNotEmpty) {
+        _expandedItems = rawItems
+            .split(',')
+            .map((e) => int.tryParse(e.trim()))
+            .whereType<int>()
+            .where((id) => _pagesWithSubItems.contains(id))
+            .toSet();
+      }
+    } catch (_) {}
+  }
+
+  void _saveCollapsedSections() {
+    try {
+      html.window.localStorage[_collapsedSectionsStorageKey] =
+          _collapsedSections.join(',');
+    } catch (_) {}
+  }
+
+  void _saveExpandedItems() {
+    try {
+      html.window.localStorage[_expandedItemsStorageKey] =
+          _expandedItems.join(',');
+    } catch (_) {}
+  }
+
+  void _toggleSidebarItemExpand(int itemIndex) {
+    setState(() {
+      if (_expandedItems.contains(itemIndex)) {
+        _expandedItems.remove(itemIndex);
+      } else {
+        _expandedItems.add(itemIndex);
+      }
+    });
+    _saveExpandedItems();
+  }
+
+  String _sectionIdForIndex(int index) {
+    switch (index) {
+      case 0:
+      case 1:
+      case 2:
+      case 3:
+      case 16:
+        return 'cluster';
+      case 4:
+      case 7:
+      case 8:
+        return 'infrastructure';
+      case 6:
+      case 9:
+      case 10:
+      case 12:
+        return 'observability';
+      case 11:
+      case 13:
+      case 14:
+        return 'network';
+      case 5:
+      case 15:
+        return 'security';
+      default:
+        return 'cluster';
+    }
+  }
+
+  void _toggleSidebarSection(String sectionId) {
+    setState(() {
+      if (_collapsedSections.contains(sectionId)) {
+        _collapsedSections.remove(sectionId);
+      } else {
+        _collapsedSections.add(sectionId);
+      }
+    });
+    _saveCollapsedSections();
+  }
+
+  void _toggleAllSidebarSections() {
+    final allCollapsed =
+        _allSectionIds.every((id) => _collapsedSections.contains(id));
+    setState(() {
+      if (allCollapsed) {
+        _collapsedSections.clear();
+      } else {
+        _collapsedSections = _allSectionIds.toSet();
+      }
+    });
+    _saveCollapsedSections();
+  }
+
+  void _selectDestination(int index, {int? subIndex}) {
+    final owningSection = _sectionIdForIndex(index);
+    final resolvedSub = subIndex ?? _lastSubIndexByPage[index] ?? 0;
+    setState(() {
+      if (index == 3) {
+        _tasksFilterStack = null;
+      }
+      if (index == 9 || index == 11) {
+        clearGrafanaStaleCookies();
+      }
+      _selectedIndex = index;
+      _selectedSubIndex = resolvedSub;
+      if (_pagesWithSubItems.contains(index)) {
+        _lastSubIndexByPage[index] = resolvedSub;
+        if (_expandedItems.add(index)) {
+          _saveExpandedItems();
+        }
+      }
+      if (_collapsedSections.remove(owningSection)) {
+        _saveCollapsedSections();
       }
     });
   }
@@ -182,122 +326,378 @@ class _AppShellState extends State<AppShell> {
     return '$hour:$min:$sec';
   }
 
-  List<SidebarItem> _buildSidebarItems() {
+  List<SidebarSection> _buildSidebarSections() {
     final running = _state.tasks.where((t) => t.status == 'running').length;
-    final items = [
-      const SidebarItem(
-        icon: Icons.dashboard_outlined,
-        activeIcon: Icons.dashboard,
-        label: 'Overview',
-      ),
-      SidebarItem(
-        icon: Icons.dns_outlined,
-        activeIcon: Icons.dns,
-        label: 'Centurions [Host]',
-        badgeCount: _state.nodes.length,
-        showBadge: true,
-      ),
-      SidebarItem(
-        icon: Icons.layers_outlined,
-        activeIcon: Icons.layers,
-        label: 'Legions [Stacks]',
-        badgeCount: _state.stacks.length,
-        showBadge: true,
-      ),
-      SidebarItem(
-        icon: Icons.view_in_ar_outlined,
-        activeIcon: Icons.view_in_ar,
-        label: 'Containers',
-        badgeCount: running,
-        showBadge: true,
-      ),
-      const SidebarItem(
-        icon: Icons.inventory_2_outlined,
-        activeIcon: Icons.inventory_2,
-        label: 'Storage & Backups',
-      ),
-      const SidebarItem(
-        icon: Icons.security_outlined,
-        activeIcon: Icons.security,
-        label: 'Image Security & SBOM',
-      ),
-      const SidebarItem(
-        icon: Icons.speed_outlined,
-        activeIcon: Icons.speed,
-        label: 'SLO & Error Budgets',
-      ),
-      const SidebarItem(
-        icon: Icons.alt_route_outlined,
-        activeIcon: Icons.alt_route,
-        label: 'Caddy Ingress',
-      ),
-      const SidebarItem(
-        icon: Icons.manage_search_outlined,
-        activeIcon: Icons.manage_search,
-        label: 'CoreDNS',
-      ),
-      // Monitoring (Grafana or OpenSearch Dashboards)
-      SidebarItem(
-        icon: _state.activeSreProfile == 'enterprise-elk'
-            ? Icons.dashboard_customize_outlined
-            : Icons.analytics_outlined,
-        activeIcon: _state.activeSreProfile == 'enterprise-elk'
-            ? Icons.dashboard_customize
-            : Icons.analytics,
-        label: _state.activeSreProfile == 'enterprise-elk'
-            ? 'OpenSearch Dashboards'
-            : (_state.activeSreProfile == 'ultra-light' ? 'VMUI / Grafana' : 'Monitoring'),
-      ),
-      // Logs Explorer (Loki, OpenSearch SIEM or VictoriaLogs)
-      SidebarItem(
-        icon: _state.activeSreProfile == 'enterprise-elk'
-            ? Icons.security_update_good_outlined
-            : Icons.receipt_long_outlined,
-        activeIcon: _state.activeSreProfile == 'enterprise-elk'
-            ? Icons.security_update_good
-            : Icons.receipt_long,
-        label: _state.activeSreProfile == 'enterprise-elk'
-            ? 'SIEM & Audit Logs'
-            : (_state.activeSreProfile == 'ultra-light' ? 'VictoriaLogs' : 'Loki Logs'),
-      ),
-      const SidebarItem(
-        icon: Icons.network_check_outlined,
-        activeIcon: Icons.network_check,
-        label: 'Network Monitor',
-      ),
-      SidebarItem(
-        icon: _state.activeSreProfile == 'enterprise-elk'
-            ? Icons.polyline_outlined
-            : Icons.timeline_outlined,
-        activeIcon: _state.activeSreProfile == 'enterprise-elk'
-            ? Icons.polyline
-            : Icons.timeline,
-        label: _state.activeSreProfile == 'enterprise-elk'
-            ? 'Trace Analytics'
-            : 'Jaeger',
-      ),
-      const SidebarItem(
+    return [
+      SidebarSection(
+        id: 'cluster',
+        title: 'Cluster',
         icon: Icons.hub_outlined,
-        activeIcon: Icons.hub,
-        label: 'Network Topology',
+        items: [
+          const SidebarItem(
+            index: 0,
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard,
+            label: 'Overview',
+          ),
+          SidebarItem(
+            index: 1,
+            icon: Icons.dns_outlined,
+            activeIcon: Icons.dns,
+            label: 'Centurions [Host]',
+            badgeCount: _state.nodes.length,
+            showBadge: true,
+          ),
+          SidebarItem(
+            index: 2,
+            icon: Icons.layers_outlined,
+            activeIcon: Icons.layers,
+            label: 'Legions [Stacks]',
+            badgeCount: _state.stacks.length,
+            showBadge: true,
+            subItems: const [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.layers_outlined,
+                label: 'Managed Stacks',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.travel_explore_outlined,
+                label: 'Unmanaged / Discovered',
+              ),
+            ],
+          ),
+          SidebarItem(
+            index: 3,
+            icon: Icons.view_in_ar_outlined,
+            activeIcon: Icons.view_in_ar,
+            label: 'Containers',
+            badgeCount: running,
+            showBadge: true,
+          ),
+          const SidebarItem(
+            index: 16,
+            icon: Icons.code_outlined,
+            activeIcon: Icons.code,
+            label: 'Compose Studio',
+          ),
+        ],
       ),
-      const SidebarItem(
-        icon: Icons.grain_outlined,
-        activeIcon: Icons.grain,
-        label: 'eBPF Live Hub',
+      const SidebarSection(
+        id: 'infrastructure',
+        title: 'Infrastructure',
+        icon: Icons.storage_outlined,
+        items: [
+          SidebarItem(
+            index: 4,
+            icon: Icons.inventory_2_outlined,
+            activeIcon: Icons.inventory_2,
+            label: 'Storage & Backups',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.inventory_2_outlined,
+                label: 'Volumes',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.backup_outlined,
+                label: 'Backups & Snapshots',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.schedule_outlined,
+                label: 'Schedules',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.folder_shared_outlined,
+                label: 'Storage Pools',
+              ),
+              SidebarSubItem(
+                subIndex: 4,
+                icon: Icons.dns_outlined,
+                label: 'Network Mounts & fstab',
+              ),
+              SidebarSubItem(
+                subIndex: 5,
+                icon: Icons.hub_outlined,
+                label: 'GlusterFS Cluster',
+              ),
+            ],
+          ),
+          SidebarItem(
+            index: 7,
+            icon: Icons.alt_route_outlined,
+            activeIcon: Icons.alt_route,
+            label: 'Load Balancing',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.dashboard_outlined,
+                label: 'Dashboard',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.fork_right,
+                label: 'Routes',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.description_outlined,
+                label: 'Caddyfile',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.lock_outlined,
+                label: 'TLS Certs',
+              ),
+              SidebarSubItem(
+                subIndex: 4,
+                icon: Icons.receipt_long_outlined,
+                label: 'Access Logs',
+              ),
+              SidebarSubItem(
+                subIndex: 5,
+                icon: Icons.tune,
+                label: 'Log Config',
+              ),
+              SidebarSubItem(
+                subIndex: 6,
+                icon: Icons.show_chart,
+                label: 'Metrics',
+              ),
+              SidebarSubItem(
+                subIndex: 7,
+                icon: Icons.security_outlined,
+                label: 'WAF & Threat Shield',
+              ),
+            ],
+          ),
+          SidebarItem(
+            index: 8,
+            icon: Icons.manage_search_outlined,
+            activeIcon: Icons.manage_search,
+            label: 'CoreDNS',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.lan_outlined,
+                label: 'Auto-Discovered (*.gbnt)',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.edit_note,
+                label: 'Custom Static Records',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.play_arrow_outlined,
+                label: 'DNS Playground (Dig)',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.settings_outlined,
+                label: 'Upstream & Corefile',
+              ),
+            ],
+          ),
+        ],
       ),
-      const SidebarItem(
-        icon: Icons.shield_outlined,
-        activeIcon: Icons.shield,
-        label: 'Security & Directory',
+      SidebarSection(
+        id: 'observability',
+        title: 'Observability & SRE',
+        icon: Icons.insights_outlined,
+        items: [
+          const SidebarItem(
+            index: 6,
+            icon: Icons.speed_outlined,
+            activeIcon: Icons.speed,
+            label: 'SLO & Error Budgets',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.speed_outlined,
+                label: 'Overview & Budgets',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.route_outlined,
+                label: 'User Journeys',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.timeline,
+                label: 'Deployment Correlation',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.dashboard_customize_outlined,
+                label: 'SLI Templates',
+              ),
+              SidebarSubItem(
+                subIndex: 4,
+                icon: Icons.science_outlined,
+                label: 'Backtest & Validator',
+              ),
+            ],
+          ),
+          // Monitoring (Grafana or OpenSearch Dashboards)
+          SidebarItem(
+            index: 9,
+            icon: _state.activeSreProfile == 'enterprise-elk'
+                ? Icons.dashboard_customize_outlined
+                : Icons.analytics_outlined,
+            activeIcon: _state.activeSreProfile == 'enterprise-elk'
+                ? Icons.dashboard_customize
+                : Icons.analytics,
+            label: _state.activeSreProfile == 'enterprise-elk'
+                ? 'OpenSearch Dashboards'
+                : (_state.activeSreProfile == 'ultra-light'
+                    ? 'VMUI / Grafana'
+                    : 'Monitoring'),
+          ),
+          // Logs Explorer (Loki, OpenSearch SIEM or VictoriaLogs)
+          SidebarItem(
+            index: 10,
+            icon: _state.activeSreProfile == 'enterprise-elk'
+                ? Icons.security_update_good_outlined
+                : Icons.receipt_long_outlined,
+            activeIcon: _state.activeSreProfile == 'enterprise-elk'
+                ? Icons.security_update_good
+                : Icons.receipt_long,
+            label: _state.activeSreProfile == 'enterprise-elk'
+                ? 'SIEM & Audit Logs'
+                : (_state.activeSreProfile == 'ultra-light'
+                    ? 'VictoriaLogs'
+                    : 'Loki Logs'),
+          ),
+          SidebarItem(
+            index: 12,
+            icon: _state.activeSreProfile == 'enterprise-elk'
+                ? Icons.polyline_outlined
+                : Icons.timeline_outlined,
+            activeIcon: _state.activeSreProfile == 'enterprise-elk'
+                ? Icons.polyline
+                : Icons.timeline,
+            label: _state.activeSreProfile == 'enterprise-elk'
+                ? 'Trace Analytics'
+                : 'Jaeger',
+          ),
+        ],
       ),
-      const SidebarItem(
-        icon: Icons.code_outlined,
-        activeIcon: Icons.code,
-        label: 'Compose Studio',
+      const SidebarSection(
+        id: 'network',
+        title: 'Network & eBPF',
+        icon: Icons.lan_outlined,
+        items: [
+          SidebarItem(
+            index: 11,
+            icon: Icons.network_check_outlined,
+            activeIcon: Icons.network_check,
+            label: 'Network Monitor',
+          ),
+          SidebarItem(
+            index: 13,
+            icon: Icons.hub_outlined,
+            activeIcon: Icons.hub,
+            label: 'Network Topology',
+          ),
+          SidebarItem(
+            index: 14,
+            icon: Icons.grain_outlined,
+            activeIcon: Icons.grain,
+            label: 'eBPF Live Hub',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.swap_calls,
+                label: 'Live Captured Flows',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.hub_outlined,
+                label: 'Service Mesh Topology',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.memory_outlined,
+                label: 'Kernel Probes & Diagnostics',
+              ),
+            ],
+          ),
+        ],
+      ),
+      const SidebarSection(
+        id: 'security',
+        title: 'Security',
+        icon: Icons.verified_user_outlined,
+        items: [
+          SidebarItem(
+            index: 5,
+            icon: Icons.security_outlined,
+            activeIcon: Icons.security,
+            label: 'Image Security & SBOM',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.security_outlined,
+                label: 'Vulnerabilities',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.inventory_outlined,
+                label: 'SBOM Explorer',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.verified_outlined,
+                label: 'Signatures & Keys',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.gavel_outlined,
+                label: 'Gatekeeper Policies',
+              ),
+            ],
+          ),
+          SidebarItem(
+            index: 15,
+            icon: Icons.shield_outlined,
+            activeIcon: Icons.shield,
+            label: 'Security & Directory',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.people_alt_outlined,
+                label: 'Local Users & MFA',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.dns_outlined,
+                label: 'Active Directory / LDAP',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.vpn_key_outlined,
+                label: 'SSO / OIDC',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.security_update_good_outlined,
+                label: 'Forensic Audit & SIEM',
+              ),
+              SidebarSubItem(
+                subIndex: 4,
+                icon: Icons.verified_user_outlined,
+                label: 'Compliance & Regulatory',
+              ),
+            ],
+          ),
+        ],
       ),
     ];
-    return items;
   }
 
   // Navigation labels for the header breadcrumb
@@ -309,7 +709,7 @@ class _AppShellState extends State<AppShell> {
     'Storage & Backups',
     'Image Security & SBOM',
     'SLO & Error Budgets',
-    'Caddy Ingress',
+    'Load Balancing',
     'CoreDNS',
     'Monitoring',
     'Loki Logs',
@@ -320,6 +720,21 @@ class _AppShellState extends State<AppShell> {
     'Security & Directory',
     'Compose Studio',
   ];
+
+  String? _getSubPageLabel(List<SidebarSection> sections, int index, int subIndex) {
+    for (final section in sections) {
+      for (final item in section.items) {
+        if (item.index == index && item.subItems.isNotEmpty) {
+          for (final sub in item.subItems) {
+            if (sub.subIndex == subIndex) {
+              return sub.label;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
 
   String _getPageLabel(int index) {
     if (index == 9) {
@@ -348,16 +763,17 @@ class _AppShellState extends State<AppShell> {
         return OverviewPage(
           state: _state,
           onRefresh: _fetchData,
-          onViewLegions: () => setState(() => _selectedIndex = 2),
-          onViewCenturions: () => setState(() => _selectedIndex = 1),
-          onViewTasks: () => setState(() {
-            _tasksFilterStack = null;
-            _selectedIndex = 3;
-          }),
+          onViewLegions: () => _selectDestination(2),
+          onViewCenturions: () => _selectDestination(1),
+          onViewTasks: () => _selectDestination(3),
           onViewStackContainers: (stackName) {
+            final owningSection = _sectionIdForIndex(3);
             setState(() {
               _tasksFilterStack = stackName;
               _selectedIndex = 3;
+              if (_collapsedSections.remove(owningSection)) {
+                _saveCollapsedSections();
+              }
             });
           },
         );
@@ -367,16 +783,26 @@ class _AppShellState extends State<AppShell> {
         return LegionsPage(
           state: _state,
           onRefresh: _fetchData,
+          selectedSubIndex: _selectedSubIndex,
+          onSwitchToManaged: () => _selectDestination(2, subIndex: 0),
           onViewContainerLogs: (containerName) {
+            final owningSection = _sectionIdForIndex(10);
             setState(() {
               _lokiFilterContainer = containerName;
               _selectedIndex = 10; // Navigate to Loki Logs Explorer
+              if (_collapsedSections.remove(owningSection)) {
+                _saveCollapsedSections();
+              }
             });
           },
           onViewStackContainers: (stackName) {
+            final owningSection = _sectionIdForIndex(3);
             setState(() {
               _tasksFilterStack = stackName;
               _selectedIndex = 3; // Navigate to Containers tab filtered by stack
+              if (_collapsedSections.remove(owningSection)) {
+                _saveCollapsedSections();
+              }
             });
           },
         );
@@ -387,19 +813,36 @@ class _AppShellState extends State<AppShell> {
           initialFilterStack: _tasksFilterStack,
         );
       case 4:
-        return StoragePage(state: _state, onRefresh: _fetchData);
+        return StoragePage(
+          state: _state,
+          onRefresh: _fetchData,
+          selectedSubIndex: _selectedSubIndex,
+        );
       case 5:
         return ImageSecurityPage(
           state: _state,
           onRefresh: _fetchData,
-          onNavigateTab: (idx) => setState(() => _selectedIndex = idx),
+          onNavigateTab: (idx) => _selectDestination(idx),
+          selectedSubIndex: _selectedSubIndex,
         );
       case 6:
-        return SloPage(state: _state, onRefresh: _fetchData);
+        return SloPage(
+          state: _state,
+          onRefresh: _fetchData,
+          selectedSubIndex: _selectedSubIndex,
+        );
       case 7:
-        return CaddyPage(state: _state, onRefresh: _fetchData);
+        return CaddyPage(
+          state: _state,
+          onRefresh: _fetchData,
+          selectedSubIndex: _selectedSubIndex,
+        );
       case 8:
-        return CoreDnsPage(state: _state, onRefresh: _fetchData);
+        return CoreDnsPage(
+          state: _state,
+          onRefresh: _fetchData,
+          selectedSubIndex: _selectedSubIndex,
+        );
       case 9:
         if (_state.activeSreProfile == 'enterprise-elk') {
           return const OpenSearchDashboardsPage();
@@ -435,9 +878,16 @@ class _AppShellState extends State<AppShell> {
       case 13:
         return _scopePage;
       case 14:
-        return _ebpfPage;
+        return EbpfPage(
+          key: const ValueKey('page-ebpf-singleton'),
+          selectedSubIndex: _selectedSubIndex,
+        );
       case 15:
-        return SecurityPage(state: _state, onRefresh: _fetchData);
+        return SecurityPage(
+          state: _state,
+          onRefresh: _fetchData,
+          selectedSubIndex: _selectedSubIndex,
+        );
       case 16:
         return ComposeStudioPage(state: _state, onRefresh: _fetchData);
       default:
@@ -457,23 +907,20 @@ class _AppShellState extends State<AppShell> {
     final isDark = theme.brightness == Brightness.dark;
     final user = widget.currentUser ?? _state.currentUser;
 
+    final sidebarSections = _buildSidebarSections();
+    final activeSubLabel =
+        _getSubPageLabel(sidebarSections, _selectedIndex, _selectedSubIndex);
+
     return Scaffold(
       body: Row(
         children: [
           // ─── Sidebar ─────────────────────────────────────
           GubernatorSidebar(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() {
-                if (index == 3) {
-                  _tasksFilterStack = null;
-                }
-                if (index == 9 || index == 11) {
-                  clearGrafanaStaleCookies();
-                }
-                _selectedIndex = index;
-              });
-            },
+            selectedSubIndex: _selectedSubIndex,
+            onDestinationSelected: (index) => _selectDestination(index),
+            onSubDestinationSelected: (index, subIndex) =>
+                _selectDestination(index, subIndex: subIndex),
             currentThemeId: widget.currentThemeId,
             onThemeChanged: widget.onThemeChanged,
             version: _state.version,
@@ -482,7 +929,12 @@ class _AppShellState extends State<AppShell> {
             onVersionCheckPressed: _showVersionCheckModal,
             onUpdatePressed: _showUpdateDialog,
             onSettingsPressed: _openSettings,
-            items: _buildSidebarItems(),
+            sections: sidebarSections,
+            collapsedSections: _collapsedSections,
+            onToggleSection: _toggleSidebarSection,
+            expandedItems: _expandedItems,
+            onToggleItemExpand: _toggleSidebarItemExpand,
+            onToggleAllSections: _toggleAllSidebarSections,
             isCollapsed: _sidebarCollapsed,
             onToggleCollapse: () =>
                 setState(() => _sidebarCollapsed = !_sidebarCollapsed),
@@ -516,6 +968,26 @@ class _AppShellState extends State<AppShell> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      if (activeSubLabel != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.45),
+                          ),
+                        ),
+                        Text(
+                          activeSubLabel,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: GubernatorTheme.getThemeDef(
+                                    widget.currentThemeId)
+                                .sidebarActive,
+                          ),
+                        ),
+                      ],
 
                       const Spacer(),
 

@@ -296,6 +296,108 @@ class ClusterApi {
     }
   }
 
+  /// Discovers unmanaged Docker containers across all cluster nodes (Manager + Workers).
+  static Future<Map<String, dynamic>> fetchUnmanagedContainers() async {
+    final response = await http.get(
+      Uri.parse('/api/unmanaged'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    try {
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Failed to scan unmanaged containers');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Server error: ${response.statusCode}');
+    }
+  }
+
+  /// Reverse-engineers a docker-compose.yml from docker inspect (or reads host compose file).
+  static Future<Map<String, dynamic>> generateUnmanagedCompose({
+    required String nodeId,
+    required List<String> containerNames,
+    String? stackName,
+    bool preferHostFile = false,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/unmanaged/generate-compose'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'node_id': nodeId,
+        'container_names': containerNames,
+        if (stackName != null && stackName.isNotEmpty) 'stack_name': stackName,
+        'prefer_host_file': preferHostFile,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    try {
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Failed to generate compose YAML');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Server error: ${response.statusCode}');
+    }
+  }
+
+  /// Adopts unmanaged containers into a managed Gubernator Stack (Zero-Downtime Register).
+  static Future<Map<String, dynamic>> adoptUnmanagedStack({
+    required String stackName,
+    required String nodeId,
+    required List<String> containerNames,
+    required String composeYaml,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/unmanaged/adopt'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'stack_name': stackName,
+        'node_id': nodeId,
+        'container_names': containerNames,
+        'compose_yaml': composeYaml,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    try {
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Failed to adopt stack');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Server error: ${response.statusCode}');
+    }
+  }
+
+  /// Executes a lifecycle action (start, stop, restart, rm) on an unmanaged container.
+  static Future<void> unmanagedContainerAction({
+    required String nodeId,
+    required String containerName,
+    required String action,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/unmanaged/action'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'node_id': nodeId,
+        'container_name': containerName,
+        'action': action,
+      }),
+    );
+    if (response.statusCode != 200) {
+      try {
+        final body = jsonDecode(response.body);
+        throw Exception(body['error'] ?? 'Action failed');
+      } catch (e) {
+        if (e is Exception) rethrow;
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    }
+  }
+
   /// Retrieves the list of built-in POC examples and blueprints.
   static Future<List<POCExampleModel>> fetchPOCExamples() async {
     final response = await http.get(Uri.parse('/api/examples'), headers: authHeaders);
