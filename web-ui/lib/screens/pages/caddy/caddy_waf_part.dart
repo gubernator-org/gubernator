@@ -45,7 +45,7 @@ extension _CaddyWafExt on _CaddyPageState {
                             Row(
                               children: [
                                 Text(
-                                  'Caddy Ingress Threat Shield & Web Application Firewall (WAF)',
+                                  'Load Balancing Threat Shield & Web Application Firewall (WAF)',
                                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(width: 10),
@@ -73,7 +73,7 @@ extension _CaddyWafExt on _CaddyPageState {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Air-gapped Layer 7 threat defense built natively into Caddy Ingress. Supports manual override ("a mano") and Compose labels.',
+                              'Air-gapped Layer 7 threat defense built natively into Load Balancing (Caddy). Supports manual overrides and Compose labels.',
                               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                             ),
                           ],

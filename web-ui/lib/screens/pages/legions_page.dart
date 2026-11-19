@@ -18,6 +18,7 @@ import '../../widgets/common_widgets.dart';
 part 'legions/legions_actions_dialogs_part.dart';
 part 'legions/stack_diagnostics_dialog_part.dart';
 part 'legions/legions_unmanaged_part.dart';
+part 'legions/legions_topology_part.dart';
 
 /// Legions page — full-width stacks table with all actions + Unmanaged discovery/adoption.
 class LegionsPage extends StatefulWidget {
@@ -252,6 +253,9 @@ class _LegionsPageState extends State<LegionsPage> {
     final theme = Theme.of(context);
     if (widget.selectedSubIndex == 1) {
       return _buildUnmanagedView(theme, theme.brightness == Brightness.dark);
+    }
+    if (widget.selectedSubIndex == 2) {
+      return _buildTopologyView(theme, theme.brightness == Brightness.dark);
     }
     final allMatching = widget.state.stacks.where((s) {
       if (_searchQuery.isEmpty) return true;

@@ -366,6 +366,11 @@ class _AppShellState extends State<AppShell> {
                 icon: Icons.travel_explore_outlined,
                 label: 'Unmanaged / Discovered',
               ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.account_tree_outlined,
+                label: 'Cluster Topology',
+              ),
             ],
           ),
           SidebarItem(
@@ -865,6 +870,7 @@ class _AppShellState extends State<AppShell> {
             featureIcon: Icons.network_check,
             activeProfileId: _state.activeSreProfile,
             onSwitchedProfile: _fetchData,
+            onBackToOverview: () => _selectDestination(0),
           );
         }
         return _networkPage;
@@ -953,9 +959,7 @@ class _AppShellState extends State<AppShell> {
                     color: theme.cardTheme.color,
                     border: Border(
                       bottom: BorderSide(
-                        color: isDark
-                            ? const Color(0xFF334155)
-                            : const Color(0xFFE2E8F0),
+                        color: theme.dividerColor,
                       ),
                     ),
                   ),
@@ -993,62 +997,61 @@ class _AppShellState extends State<AppShell> {
 
                       // User Profile Badge & Role Chip
                       if (user != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.2),
+                        Builder(builder: (context) {
+                          final roleColor = user.isAdmin
+                              ? (isDark ? Colors.amber : Colors.amber.shade800)
+                              : user.isOperator
+                                  ? (isDark ? Colors.blue : Colors.blue.shade700)
+                                  : (isDark ? Colors.green : Colors.green.shade700);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: isDark ? 0.55 : 0.6),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: theme.dividerColor,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CircleAvatar(
-                                radius: 12,
-                                backgroundColor: user.isAdmin
-                                    ? Colors.amber.withValues(alpha: 0.2)
-                                    : user.isOperator
-                                        ? Colors.blue.withValues(alpha: 0.2)
-                                        : Colors.green.withValues(alpha: 0.2),
-                                child: Text(
-                                  user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: user.isAdmin ? Colors.amber : user.isOperator ? Colors.blue : Colors.green,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: roleColor.withValues(alpha: 0.18),
+                                  child: Text(
+                                    user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: roleColor,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                user.displayName,
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: user.isAdmin
-                                      ? Colors.amber.withValues(alpha: 0.15)
-                                      : user.isOperator
-                                          ? Colors.blue.withValues(alpha: 0.15)
-                                          : Colors.green.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
+                                const SizedBox(width: 8),
+                                Text(
+                                  user.displayName,
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                                 ),
-                                child: Text(
-                                  user.isAdmin ? '👑 ADMIN' : user.isOperator ? '⚡ OPERATOR' : '👁️ READ-ONLY',
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: user.isAdmin ? Colors.amber : user.isOperator ? Colors.blue : Colors.green,
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: roleColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    user.isAdmin ? '👑 ADMIN' : user.isOperator ? '⚡ OPERATOR' : '👁️ READ-ONLY',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: roleColor,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
+                              ],
+                            ),
+                          );
+                        }),
                         const SizedBox(width: 12),
                       ],
 

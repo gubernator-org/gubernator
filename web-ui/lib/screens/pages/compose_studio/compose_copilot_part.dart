@@ -758,7 +758,7 @@ extension _ComposeCopilotExt on _ComposeStudioPageState {
                 ],
 
                 if (_activeCopilotTab == 'caddy') ...[
-                  const Text('Caddy Ingress Suite & WAF', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('Load Balancing Suite & WAF', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
                   const Text('Expose your service via Caddy proxy with CoreDNS automatic resolution and Layer 7 Threat Shield.', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 16),
@@ -1280,7 +1280,7 @@ extension _ComposeCopilotExt on _ComposeStudioPageState {
                     },
                   ),
                   const SizedBox(height: 16),
-                  const Text('Caddy Ingress Dynamic Load Balancing:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('Dynamic Load Balancing (Caddy):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   _buildSnippetCard(
                     title: 'Round Robin Policy (Default)',

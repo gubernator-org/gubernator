@@ -159,7 +159,7 @@ extension _ComposeBlocksNavigatorExt on _ComposeStudioPageState {
       ('docker', 'Docker Core', Icons.view_in_ar, const Color(0xFF38BDF8)),
       ('resources', 'Resources', Icons.speed, const Color(0xFF10B981)),
       ('autoscale', 'Autoscale', Icons.bolt, const Color(0xFFA855F7)),
-      ('caddy', 'Caddy Ingress', Icons.public, const Color(0xFF8B5CF6)),
+      ('caddy', 'Load Balancing', Icons.public, const Color(0xFF8B5CF6)),
       ('coredns', 'CoreDNS (DNS)', Icons.dns, const Color(0xFF0D9488)),
       ('slo', 'Sloth SLO', Icons.show_chart, const Color(0xFFF59E0B)),
       ('security', 'Security & WAF', Icons.security, const Color(0xFFEC4899)),

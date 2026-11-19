@@ -506,38 +506,44 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Page Header
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.shield_outlined, color: primaryColor, size: 28),
-                        const SizedBox(width: 10),
-                        const Text(
-                          "Security, Directory & User Access Control",
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Local user accounts, Active Directory/LDAP servers, RBAC policies, and audit access logs.",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.shield_outlined, color: primaryColor, size: 26),
+                          const SizedBox(width: 10),
+                          const Flexible(
+                            child: Text(
+                              "Security, Directory & User Access Control",
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        "Local user accounts, Active Directory/LDAP servers, RBAC policies, and audit access logs.",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 12),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text("Refresh All"),
@@ -545,11 +551,10 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // Tab Views Container (controlled via Level-3 Sidebar Navigation)
-            SizedBox(
-              height: 980,
+            Expanded(
               child: TabBarView(
                 controller: _tabController,
                 physics: const NeverScrollableScrollPhysics(),

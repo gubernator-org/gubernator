@@ -68,7 +68,7 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
       try {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } catch (e) {
-        _showSnackBar('No se pudo abrir $cleanUrl: $e');
+        _showSnackBar('Could not open $cleanUrl: $e');
       }
     }
   }
@@ -251,9 +251,23 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
   Widget _buildDashboardTab(Node selectedNode, String status, ThemeData theme, bool isDark) {
     final activeRoutes = _routesList.length;
     final activeCerts = _certsList.length;
-    final version = _caddyStatusData['version'] ?? 'v2.8.4';
-    final uptime = _caddyStatusData['uptime_seconds'] ?? 86400;
-    final mem = ((_caddyStatusData['memory_bytes'] ?? 42500000) / 1024 / 1024).toStringAsFixed(1);
+    final activeCaddyNodes = widget.state.nodes
+        .where((n) => n.caddyStatus.toLowerCase().contains('running'))
+        .length;
+    final totalNodes = widget.state.nodes.length;
+    final version = (_caddyStatusData['version'] ?? '').toString().trim();
+    final uptimeSec = (_caddyStatusData['uptime_seconds'] as num?)?.toDouble();
+    final memBytes = (_caddyStatusData['memory_bytes'] as num?)?.toDouble();
+    final lastReload = (_caddyStatusData['last_reload'] ?? '').toString().trim();
+
+    final versionLabel = version.isNotEmpty ? version : 'Detecting...';
+    final memLabel = (memBytes != null && memBytes > 0)
+        ? '${(memBytes / 1024 / 1024).toStringAsFixed(1)} MB'
+        : 'N/A';
+    final uptimeLabel = (uptimeSec != null && uptimeSec > 0)
+        ? '${(uptimeSec / 3600).toStringAsFixed(1)} hrs'
+        : (status.contains('running') ? 'Active' : 'Stopped');
+    final reloadLabel = lastReload.isNotEmpty ? lastReload : 'Live Sync';
 
     return SingleChildScrollView(
       child: Column(
@@ -261,9 +275,9 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
         children: [
           Row(
             children: [
-              Expanded(child: _metricCard('Caddy Status', status.contains('running') ? 'RUNNING' : 'STOPPED', Icons.check_circle_outline, Colors.green, theme)),
+              Expanded(child: _metricCard('Caddy Status', status.contains('running') ? 'RUNNING' : 'STOPPED', Icons.check_circle_outline, status.contains('running') ? Colors.green : Colors.redAccent, theme)),
               const SizedBox(width: 12),
-              Expanded(child: _metricCard('Active Instances', '3 Nodes', Icons.hub, Colors.blue, theme)),
+              Expanded(child: _metricCard('Active Instances', '$activeCaddyNodes / $totalNodes Nodes', Icons.hub, Colors.blue, theme)),
               const SizedBox(width: 12),
               Expanded(child: _metricCard('Managed Routes', '$activeRoutes Hosts', Icons.alt_route, const Color(0xFFF97316), theme)),
               const SizedBox(width: 12),
@@ -281,19 +295,24 @@ class _CaddyPageState extends State<CaddyPage> with SingleTickerProviderStateMix
                     children: [
                       const Icon(Icons.memory, size: 20, color: Color(0xFFF97316)),
                       const SizedBox(width: 8),
-                      Text('Process & System Info (${selectedNode.id})', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(
+                          'Process & System Info (${selectedNode.id})',
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Row(
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      _infoPill('Caddy Version', version, isDark),
-                      const SizedBox(width: 12),
-                      _infoPill('Memory Usage', '$mem MB', isDark),
-                      const SizedBox(width: 12),
-                      _infoPill('Uptime', '${(uptime / 3600).toStringAsFixed(1)} hrs', isDark),
-                      const SizedBox(width: 12),
-                      _infoPill('Last Reload', '2 hours ago', isDark),
+                      _infoPill('Caddy Version', versionLabel, isDark),
+                      _infoPill('Memory Usage', memLabel, isDark),
+                      _infoPill('Uptime', uptimeLabel, isDark),
+                      _infoPill('Config Sync', reloadLabel, isDark),
                     ],
                   ),
                 ],

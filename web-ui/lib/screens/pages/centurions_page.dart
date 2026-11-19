@@ -27,6 +27,7 @@ class CenturionsPage extends StatefulWidget {
 
 class _CenturionsPageState extends State<CenturionsPage> {
   String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
   int? _sortColumnIndex;
   bool _sortAscending = true;
   final ScrollController _horizontalScrollController = ScrollController();
@@ -34,6 +35,7 @@ class _CenturionsPageState extends State<CenturionsPage> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _horizontalScrollController.dispose();
     _verticalScrollController.dispose();
     super.dispose();
@@ -525,12 +527,22 @@ class _CenturionsPageState extends State<CenturionsPage> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
-                        decoration: const InputDecoration(
+                        controller: _searchController,
+                        decoration: InputDecoration(
                           hintText: 'Search nodes...',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: const OutlineInputBorder(),
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                         onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
                       ),

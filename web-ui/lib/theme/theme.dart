@@ -402,7 +402,7 @@ class GubernatorTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: def.primary,
-          foregroundColor: def.isDark ? Colors.white : Colors.white,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -425,15 +425,15 @@ class GubernatorTheme {
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: def.sidebarBg,
-        selectedIconTheme: const IconThemeData(color: Colors.white, size: 22),
-        unselectedIconTheme: IconThemeData(color: Colors.white.withValues(alpha: 0.5), size: 22),
-        selectedLabelTextStyle: const TextStyle(
-          color: Colors.white,
+        selectedIconTheme: IconThemeData(color: def.textPrimary, size: 22),
+        unselectedIconTheme: IconThemeData(color: def.textSecondary, size: 22),
+        selectedLabelTextStyle: TextStyle(
+          color: def.textPrimary,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelTextStyle: TextStyle(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: def.textSecondary,
           fontSize: 13,
           fontWeight: FontWeight.w400,
         ),

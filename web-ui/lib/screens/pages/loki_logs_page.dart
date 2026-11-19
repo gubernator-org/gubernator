@@ -152,7 +152,10 @@ class _LokiLogsPageState extends State<LokiLogsPage> {
           children: [
             const Icon(Icons.check_circle, color: Colors.greenAccent, size: 18),
             const SizedBox(width: 8),
-            Text("Copied ${_logs.length} log lines to clipboard"),
+            Text(
+              "Copied ${_logs.length} log lines to clipboard",
+              style: const TextStyle(color: Colors.white),
+            ),
           ],
         ),
         backgroundColor: const Color(0xFF1E293B),

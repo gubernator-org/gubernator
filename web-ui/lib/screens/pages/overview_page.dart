@@ -49,10 +49,6 @@ class OverviewPage extends StatelessWidget {
             SreProfileOverviewCard(onRefresh: onRefresh),
             const SizedBox(height: 20),
 
-            // ─── Quick Links Row ───────────────────────────
-            _buildQuickLinksRow(theme),
-            const SizedBox(height: 24),
-
             // ─── Stacks + Nodes Overview ───────────────────
             LayoutBuilder(
               builder: (context, constraints) {
@@ -100,18 +96,21 @@ class OverviewPage extends StatelessWidget {
             subtitle: '$activeNodes active',
             icon: Icons.dns,
             color: const Color(0xFF3B82F6),
+            onTap: onViewCenturions,
           ),
           _AnimatedStatCard(
             label: 'Stacks',
             value: '${state.stacks.length}',
             icon: Icons.layers,
             color: const Color(0xFF8B5CF6),
+            onTap: onViewLegions,
           ),
           _AnimatedStatCard(
             label: 'Services',
             value: '${state.services.length}',
             icon: Icons.miscellaneous_services,
             color: const Color(0xFF06B6D4),
+            onTap: onViewLegions,
           ),
           _AnimatedStatCard(
             label: 'Host Storage',
@@ -119,12 +118,14 @@ class OverviewPage extends StatelessWidget {
             subtitle: totalClusterDisk > 0 ? '/ ${_formatBytes(totalClusterDisk)} (${diskUsagePercent.toStringAsFixed(0)}%)' : 'Cluster Pool',
             icon: Icons.storage_outlined,
             color: diskUsagePercent > 85 ? const Color(0xFFEF4444) : const Color(0xFF0EA5E9),
+            onTap: onViewCenturions,
           ),
           _AnimatedStatCard(
             label: 'Containers',
             value: '${state.tasks.length}',
             icon: Icons.view_in_ar,
             color: const Color(0xFFF97316),
+            onTap: onViewTasks,
           ),
           _AnimatedStatCard(
             label: 'Running',
@@ -132,6 +133,7 @@ class OverviewPage extends StatelessWidget {
             icon: Icons.play_circle,
             color: const Color(0xFF10B981),
             isHighlight: true,
+            onTap: onViewTasks,
           ),
         ];
 
@@ -151,42 +153,6 @@ class OverviewPage extends StatelessWidget {
               .toList(),
         );
       },
-    );
-  }
-
-  Widget _buildQuickLinksRow(ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickLinkCard(
-            icon: Icons.layers,
-            label: 'Legions',
-            count: state.stacks.length,
-            color: const Color(0xFF8B5CF6),
-            onTap: onViewLegions,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickLinkCard(
-            icon: Icons.dns,
-            label: 'Centurions',
-            count: state.nodes.length,
-            color: const Color(0xFF3B82F6),
-            onTap: onViewCenturions,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickLinkCard(
-            icon: Icons.view_in_ar,
-            label: 'Containers',
-            count: state.tasks.length,
-            color: const Color(0xFFF97316),
-            onTap: onViewTasks,
-          ),
-        ),
-      ],
     );
   }
 
@@ -541,6 +507,7 @@ class _AnimatedStatCard extends StatefulWidget {
   final IconData icon;
   final Color color;
   final bool isHighlight;
+  final VoidCallback? onTap;
 
   const _AnimatedStatCard({
     required this.label,
@@ -549,6 +516,7 @@ class _AnimatedStatCard extends StatefulWidget {
     required this.color,
     this.subtitle,
     this.isHighlight = false,
+    this.onTap,
   });
 
   @override
@@ -564,9 +532,14 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard> {
     final isDark = theme.brightness == Brightness.dark;
 
     return MouseRegion(
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
-      child: AnimatedContainer(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
         transform: _hovering
@@ -638,6 +611,7 @@ class _AnimatedStatCardState extends State<_AnimatedStatCard> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

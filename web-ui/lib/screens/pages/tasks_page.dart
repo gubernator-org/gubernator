@@ -905,70 +905,79 @@ class _TasksPageState extends State<TasksPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.view_in_ar, size: 22, color: theme.colorScheme.primary),
-                  const SizedBox(width: 10),
-                  Text('Containers (Cohorts & Workloads)',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  if (hasActiveFilters) ...[
-                    OutlinedButton.icon(
-                      onPressed: _clearFilters,
-                      icon: const Icon(Icons.filter_alt_off, size: 16),
-                      label: const Text('Clear Filters'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: theme.colorScheme.error,
-                        side: BorderSide(color: theme.colorScheme.error),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  if (checkedCount > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.check_box, size: 16, color: theme.colorScheme.onPrimaryContainer),
-                        const SizedBox(width: 6),
-                        Text('$checkedCount selected',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimaryContainer)),
-                      ]),
-                    ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: () => _bulkAction('start'),
-                      icon: const Icon(Icons.play_arrow, size: 16, color: Colors.green),
-                      label: const Text('Start'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
-                    ),
-                    const SizedBox(width: 6),
-                    OutlinedButton.icon(
-                      onPressed: () => _bulkAction('stop'),
-                      icon: const Icon(Icons.stop, size: 16, color: Colors.amber),
-                      label: const Text('Stop'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
-                    ),
-                    const SizedBox(width: 6),
-                    OutlinedButton.icon(
-                      onPressed: () => _bulkAction('restart'),
-                      icon: const Icon(Icons.refresh, size: 16, color: Colors.blue),
-                      label: const Text('Restart'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
-                    ),
-                    const SizedBox(width: 6),
-                    FilledButton.icon(
-                      onPressed: () => _bulkAction('delete'),
-                      icon: const Icon(Icons.delete, size: 16),
-                      label: const Text('Remove'),
-                      style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
-                    ),
-                  ],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.view_in_ar, size: 22, color: theme.colorScheme.primary),
+                      const SizedBox(width: 10),
+                      Text('Containers (Cohorts & Workloads)',
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (hasActiveFilters)
+                        OutlinedButton.icon(
+                          onPressed: _clearFilters,
+                          icon: const Icon(Icons.filter_alt_off, size: 16),
+                          label: const Text('Clear Filters'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            visualDensity: VisualDensity.compact,
+                            foregroundColor: theme.colorScheme.error,
+                            side: BorderSide(color: theme.colorScheme.error),
+                          ),
+                        ),
+                      if (checkedCount > 0) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.check_box, size: 16, color: theme.colorScheme.onPrimaryContainer),
+                            const SizedBox(width: 6),
+                            Text('$checkedCount selected',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimaryContainer)),
+                          ]),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _bulkAction('start'),
+                          icon: const Icon(Icons.play_arrow, size: 16, color: Colors.green),
+                          label: const Text('Start'),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _bulkAction('stop'),
+                          icon: const Icon(Icons.stop, size: 16, color: Colors.amber),
+                          label: const Text('Stop'),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _bulkAction('restart'),
+                          icon: const Icon(Icons.refresh, size: 16, color: Colors.blue),
+                          label: const Text('Restart'),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
+                        ),
+                        FilledButton.icon(
+                          onPressed: () => _bulkAction('delete'),
+                          icon: const Icon(Icons.delete, size: 16),
+                          label: const Text('Remove'),
+                          style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), visualDensity: VisualDensity.compact),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1017,6 +1026,7 @@ class _TasksPageState extends State<TasksPage> {
                                   onPressed: () {
                                     _searchController.clear();
                                     setState(() => _searchQuery = '');
+                                    _updateTaskGrid();
                                   },
                                 )
                               : null,
@@ -1024,7 +1034,10 @@ class _TasksPageState extends State<TasksPage> {
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+                        onChanged: (val) {
+                          setState(() => _searchQuery = val.toLowerCase());
+                          _updateTaskGrid();
+                        },
                       ),
                     ),
                   ],
@@ -1040,7 +1053,7 @@ class _TasksPageState extends State<TasksPage> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: PlutoGrid(
-                      key: ValueKey('tasks-grid-$_selectedGroup-$_searchQuery-${widget.state.tasks.length}'),
+                      key: ValueKey('tasks-grid-$_selectedGroup'),
                       columns: columns,
                       rows: _getPlutoRows(theme),
                       createFooter: (stateManager) {
@@ -1052,7 +1065,7 @@ class _TasksPageState extends State<TasksPage> {
                         if (rowColorContext.rowIdx % 2 != 0) {
                           return theme.colorScheme.onSurface.withValues(alpha: 0.04);
                         }
-                        return theme.brightness == Brightness.dark ? const Color(0xFF111111) : Colors.white;
+                        return theme.colorScheme.surface;
                       },
                       onLoaded: (PlutoGridOnLoadedEvent event) {
                         _gridStateManager = event.stateManager;
@@ -1063,8 +1076,18 @@ class _TasksPageState extends State<TasksPage> {
                       },
                       configuration: PlutoGridConfiguration(
                         style: theme.brightness == Brightness.dark
-                            ? const PlutoGridStyleConfig.dark()
-                            : const PlutoGridStyleConfig(),
+                            ? PlutoGridStyleConfig.dark(
+                                gridBackgroundColor: theme.colorScheme.surface,
+                                rowColor: theme.colorScheme.surface,
+                                gridBorderColor: theme.dividerColor,
+                                borderColor: theme.dividerColor.withValues(alpha: 0.5),
+                              )
+                            : PlutoGridStyleConfig(
+                                gridBackgroundColor: theme.colorScheme.surface,
+                                rowColor: theme.colorScheme.surface,
+                                gridBorderColor: theme.dividerColor,
+                                borderColor: theme.dividerColor.withValues(alpha: 0.5),
+                              ),
                         columnSize: const PlutoGridColumnSizeConfig(autoSizeMode: PlutoAutoSizeMode.scale),
                       ),
                     ),

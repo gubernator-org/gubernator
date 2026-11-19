@@ -92,7 +92,7 @@ class _ScopePageState extends State<ScopePage> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.greenAccent, size: 18),
                 const SizedBox(width: 8),
-                Expanded(child: Text(msg)),
+                Expanded(child: Text(msg, style: const TextStyle(color: Colors.white))),
               ],
             ),
             backgroundColor: const Color(0xFF1E293B),

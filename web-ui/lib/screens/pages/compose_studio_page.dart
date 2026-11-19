@@ -660,7 +660,12 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
             children: [
               const Icon(Icons.check_circle, color: Colors.greenAccent, size: 18),
               const SizedBox(width: 8),
-              Expanded(child: Text('Saved to Master server: $savedPath')),
+              Expanded(
+                child: Text(
+                  'Saved to Master server: $savedPath',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
             ],
           ),
           backgroundColor: const Color(0xFF1E293B),
@@ -939,7 +944,11 @@ class _ComposeStudioPageState extends State<ComposeStudioPage> {
               Icon(icon, color: color, size: 18),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(result.message, overflow: TextOverflow.ellipsis),
+                child: Text(
+                  result.message,
+                  style: const TextStyle(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

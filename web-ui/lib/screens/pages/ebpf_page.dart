@@ -266,138 +266,149 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
         color: theme.colorScheme.surface,
         border: Border(bottom: BorderSide(color: theme.dividerColor)),
       ),
-      child: Row(
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
         children: [
-          // Icon
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF06B6D4).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.grain, color: Color(0xFF06B6D4), size: 22),
-          ),
-          const SizedBox(width: 14),
-
-          // Title & Subtitle
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Text(
-                    'eBPF Live Hub & Kernel Observability',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 10),
-                  // Mode Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isKernel
-                          ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                          : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isKernel
-                            ? const Color(0xFF10B981).withValues(alpha: 0.4)
-                            : const Color(0xFFF59E0B).withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF06B6D4).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.grain, color: Color(0xFF06B6D4), size: 22),
+              ),
+              const SizedBox(width: 14),
+
+              // Title & Subtitle
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isKernel ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
                         Text(
-                          isKernel ? 'eBPF KERNEL ACTIVE' : 'eBPF EMULATION',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isKernel ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          'eBPF Live Hub & Kernel Observability',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        // Mode Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isKernel
+                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isKernel
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                                  : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isKernel ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isKernel ? 'eBPF KERNEL ACTIVE' : 'eBPF EMULATION',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isKernel ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Kernel $kernelVer • Socket & packet tracing with L4/L7 protocol decoding and service mesh topology.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Kernel $kernelVer • Socket & packet tracing with L4/L7 protocol decoding and service mesh topology.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
 
-          const Spacer(),
+          // Telemetry Pills + Controls
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildPill(
+                icon: Icons.shield,
+                label: 'Probes',
+                value: '$activeProbes Active',
+                color: const Color(0xFF06B6D4),
+                theme: theme,
+              ),
+              _buildPill(
+                icon: Icons.speed,
+                label: 'Rate',
+                value: '${pktsRate.toStringAsFixed(1)} pkts/s',
+                color: Colors.blueAccent,
+                theme: theme,
+              ),
+              _buildPill(
+                icon: Icons.swap_vert,
+                label: 'Throughput',
+                value: _formatBytesRate(bytesRate),
+                color: theme.brightness == Brightness.dark
+                    ? Colors.tealAccent
+                    : Colors.teal.shade700,
+                theme: theme,
+              ),
+              OutlinedButton.icon(
+                onPressed: _toggleAutoRefresh,
+                icon: Icon(
+                  _autoRefresh ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                  size: 16,
+                  color: _autoRefresh ? const Color(0xFF10B981) : Colors.grey,
+                ),
+                label: Text(
+                  _autoRefresh ? 'Live Tail (2s)' : 'Paused',
+                  style: TextStyle(color: _autoRefresh ? const Color(0xFF10B981) : null),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Refresh Now',
+                icon: const Icon(Icons.refresh, size: 20),
+                onPressed: _loadAllData,
+              ),
 
-          // Telemetry Pills
-          _buildPill(
-            icon: Icons.shield,
-            label: 'Probes',
-            value: '$activeProbes Active',
-            color: const Color(0xFF06B6D4),
-            theme: theme,
-          ),
-          const SizedBox(width: 8),
-          _buildPill(
-            icon: Icons.speed,
-            label: 'Rate',
-            value: '${pktsRate.toStringAsFixed(1)} pkts/s',
-            color: Colors.blueAccent,
-            theme: theme,
-          ),
-          const SizedBox(width: 8),
-          _buildPill(
-            icon: Icons.swap_vert,
-            label: 'Throughput',
-            value: _formatBytesRate(bytesRate),
-            color: Colors.tealAccent,
-            theme: theme,
-          ),
-
-          const SizedBox(width: 16),
-
-          // Live Tail Toggle
-          OutlinedButton.icon(
-            onPressed: _toggleAutoRefresh,
-            icon: Icon(
-              _autoRefresh ? Icons.pause_circle_outline : Icons.play_circle_outline,
-              size: 16,
-              color: _autoRefresh ? const Color(0xFF10B981) : Colors.grey,
-            ),
-            label: Text(
-              _autoRefresh ? 'Live Tail (2s)' : 'Paused',
-              style: TextStyle(color: _autoRefresh ? const Color(0xFF10B981) : null),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Refresh Button
-          IconButton(
-            tooltip: 'Refresh Now',
-            icon: const Icon(Icons.refresh, size: 20),
-            onPressed: _loadAllData,
-          ),
-          const SizedBox(width: 8),
-
-          // Simulation Button
-          FilledButton.icon(
-            onPressed: _openSimulationDialog,
-            icon: const Icon(Icons.bolt, size: 16),
-            label: const Text('Simulate Traffic'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF06B6D4),
-              foregroundColor: Colors.black,
-            ),
+              // Simulation Button
+              FilledButton.icon(
+                onPressed: _openSimulationDialog,
+                icon: const Icon(Icons.bolt, size: 16),
+                label: const Text('Simulate Traffic'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF06B6D4),
+                  foregroundColor: Colors.black,
+                ),
+              ),
+            ],
           ),
         ],
       ),

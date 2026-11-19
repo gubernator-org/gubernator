@@ -80,7 +80,7 @@ class _NetworkPageState extends State<NetworkPage> with AutomaticKeepAliveClient
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20),
-                tooltip: 'Recargar Monitor de Red embebido',
+                tooltip: 'Reload embedded Network Monitor',
                 onPressed: () => reloadIframe('grafana-network-iframe'),
               ),
               const SizedBox(width: 4),

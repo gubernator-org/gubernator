@@ -105,7 +105,7 @@ class OpenSearchTracesPage extends StatelessWidget {
                 },
                 icon: const Icon(Icons.auto_awesome_motion, size: 16),
                 label: const Text(
-                  'Perfiles SRE',
+                  'SRE Profiles',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),

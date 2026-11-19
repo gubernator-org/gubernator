@@ -9,6 +9,7 @@ class SreFeatureAdaptivePage extends StatelessWidget {
   final String requiredProfileName;
   final String activeProfileId;
   final VoidCallback? onSwitchedProfile;
+  final VoidCallback? onBackToOverview;
 
   const SreFeatureAdaptivePage({
     super.key,
@@ -17,6 +18,7 @@ class SreFeatureAdaptivePage extends StatelessWidget {
     this.requiredProfileName = 'Cloud-Native Balanced',
     this.activeProfileId = 'enterprise-elk',
     this.onSwitchedProfile,
+    this.onBackToOverview,
   });
 
   String _getActiveProfileTitle() {
@@ -80,8 +82,8 @@ class SreFeatureAdaptivePage extends StatelessWidget {
 
             // Explanation
             Text(
-              'Esta herramienta de observabilidad no está incluida en el perfil actual (${_getActiveProfileTitle()}). '
-              'Requiere la arquitectura $requiredProfileName (Prometheus + Grafana / Jaeger).',
+              'This observability tool is not included in the currently active profile (${_getActiveProfileTitle()}). '
+              'It requires the $requiredProfileName architecture (Prometheus + Grafana / Jaeger).',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 height: 1.5,
@@ -108,9 +110,12 @@ class SreFeatureAdaptivePage extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              'Perfil SRE Activo: ${_getActiveProfileTitle()}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            Flexible(
+                              child: Text(
+                                'Active SRE Profile: ${_getActiveProfileTitle()}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Container(
@@ -120,7 +125,7 @@ class SreFeatureAdaptivePage extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
-                                'ACTIVO',
+                                'ACTIVE',
                                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
                               ),
                             ),
@@ -129,8 +134,8 @@ class SreFeatureAdaptivePage extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           activeProfileId == 'enterprise-elk'
-                              ? 'Servicios en ejecución: OpenSearch (:9200), OpenSearch Dashboards (:5601) y Fluent Bit.'
-                              : 'Revisa los servicios correspondientes a este preset de observabilidad.',
+                              ? 'Running services: OpenSearch (:9200), OpenSearch Dashboards (:5601), and Fluent Bit.'
+                              : 'Review the services configured for this observability preset.',
                           style: TextStyle(
                             fontSize: 12,
                             color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
@@ -144,16 +149,23 @@ class SreFeatureAdaptivePage extends StatelessWidget {
             ),
             const SizedBox(height: 28),
 
-            // Action Button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // Action Buttons
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 10,
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: () {
+                    if (onBackToOverview != null) {
+                      onBackToOverview!();
+                    } else {
+                      Navigator.of(context).maybePop();
+                    }
+                  },
                   icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('Volver al Overview'),
+                  label: const Text('Back to Overview'),
                 ),
-                const SizedBox(width: 12),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFF97316),
@@ -171,7 +183,7 @@ class SreFeatureAdaptivePage extends StatelessWidget {
                   },
                   icon: const Icon(Icons.auto_awesome_motion, size: 18),
                   label: const Text(
-                    'Cambiar Perfil SRE',
+                    'Switch SRE Profile',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),

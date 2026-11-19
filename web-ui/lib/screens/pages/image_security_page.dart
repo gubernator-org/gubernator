@@ -158,41 +158,49 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
                     color: const Color(0xFFF97316).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.shield_outlined, color: Color(0xFFF97316), size: 28),
+                  child: const Icon(Icons.shield_outlined, color: Color(0xFFF97316), size: 26),
                 ),
                 const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Image Security & SBOM',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF97316).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFF97316).withValues(alpha: 0.4)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            'Image Security & SBOM',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
-                          child: const Text(
-                            'THE IMPERIAL SEAL',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFF97316), letterSpacing: 0.8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF97316).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFF97316).withValues(alpha: 0.4)),
+                            ),
+                            child: const Text(
+                              'THE IMPERIAL SEAL',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFF97316), letterSpacing: 0.8),
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Container vulnerability scanning (CVEs), Software Bill of Materials, Cosign signatures, and admission gatekeeper',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Container vulnerability scanning (CVEs), Software Bill of Materials, Cosign signatures, and admission gatekeeper',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                    ),
-                  ],
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 12),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.refresh, size: 16),
                   label: const Text('Refresh'),
@@ -202,19 +210,21 @@ class _ImageSecurityPageState extends State<ImageSecurityPage> with SingleTicker
             ),
             const SizedBox(height: 16),
 
-            // Summary Metric Badges
-            Row(
-              children: [
-                _summaryCard('Scanned Images', '${_summary.totalScanned}', Icons.image, Colors.blue, isDark),
-                const SizedBox(width: 12),
-                _summaryCard('Critical CVEs', '${_summary.criticalCount}', Icons.dangerous, Colors.redAccent, isDark),
-                const SizedBox(width: 12),
-                _summaryCard('High CVEs', '${_summary.highCount}', Icons.warning_amber, Colors.orange, isDark),
-                const SizedBox(width: 12),
-                _summaryCard('Verified Signatures', '${_summary.verifiedSigned}', Icons.verified, const Color(0xFF10B981), isDark),
-              ],
-            ),
-            const SizedBox(height: 16),
+            // Summary Metric Badges (shown on Vulnerabilities overview tab to maximize editor/table space on other tabs)
+            if (widget.selectedSubIndex == 0) ...[
+              Row(
+                children: [
+                  _summaryCard('Scanned Images', '${_summary.totalScanned}', Icons.image, Colors.blue, isDark),
+                  const SizedBox(width: 12),
+                  _summaryCard('Critical CVEs', '${_summary.criticalCount}', Icons.dangerous, Colors.redAccent, isDark),
+                  const SizedBox(width: 12),
+                  _summaryCard('High CVEs', '${_summary.highCount}', Icons.warning_amber, Colors.orange, isDark),
+                  const SizedBox(width: 12),
+                  _summaryCard('Verified Signatures', '${_summary.verifiedSigned}', Icons.verified, const Color(0xFF10B981), isDark),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Tab Views (controlled via Level-3 Sidebar Navigation)
             Expanded(

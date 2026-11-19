@@ -283,54 +283,68 @@ services:
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Icon(Icons.speed, size: 28, color: theme.colorScheme.primary),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'SLO & Error Budgets Suite',
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Google SRE Multi-Burn-Rate Sloth Engine & Pyrra Interactive Suite',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                  Icon(Icons.speed, size: 28, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SLO & Error Budgets Suite',
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Google SRE Multi-Burn-Rate Sloth Engine & Pyrra Interactive Suite',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Refresh'),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: () => _showAddEditSLODialog(),
-                icon: const Icon(Icons.add_chart, size: 18),
-                label: const Text('+ Configure / Add SLO'),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: _syncing ? null : _syncSLOs,
-                icon: _syncing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.sync, size: 18),
-                label: const Text('Sync Rules'),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _loadData,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Refresh'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => _showAddEditSLODialog(),
+                    icon: const Icon(Icons.add_chart, size: 18),
+                    label: const Text('Add SLO'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _syncing ? null : _syncSLOs,
+                    icon: _syncing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.sync, size: 18),
+                    label: const Text('Sync Rules'),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _buildSummaryCards(theme),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          if (widget.selectedSubIndex == 0) ...[
+            _buildSummaryCards(theme),
+            const SizedBox(height: 20),
+          ],
           if (_loading)
             const Center(child: Padding(padding: EdgeInsets.all(48), child: CircularProgressIndicator()))
           else if (_error != null)

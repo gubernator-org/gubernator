@@ -83,7 +83,7 @@ class _GrafanaPageState extends State<GrafanaPage> with AutomaticKeepAliveClient
                             Icon(Icons.auto_awesome_motion, size: 12, color: Color(0xFFF97316)),
                             SizedBox(width: 4),
                             Text(
-                              'ARQUITECTURA SRE',
+                              'SRE ARCHITECTURE',
                               style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFF97316)),
                             ),
                           ],
@@ -114,14 +114,14 @@ class _GrafanaPageState extends State<GrafanaPage> with AutomaticKeepAliveClient
                 },
                 icon: const Icon(Icons.auto_awesome_motion, size: 16),
                 label: const Text(
-                  'Perfiles SRE / Presets',
+                  'SRE Profiles',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20),
-                tooltip: 'Recargar Dashboard embebido',
+                tooltip: 'Reload embedded dashboard',
                 onPressed: () => reloadIframe('grafana-iframe'),
               ),
               const SizedBox(width: 4),

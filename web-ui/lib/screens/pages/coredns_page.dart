@@ -318,7 +318,9 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
             label: 'CLUSTER DOMAIN',
             value: clusterDomain,
             icon: Icons.language,
-            valueColor: Colors.cyanAccent,
+            valueColor: theme.brightness == Brightness.dark
+                ? Colors.cyanAccent
+                : Colors.cyan.shade700,
             trailing: canEdit
                 ? IconButton(
                     icon: const Icon(Icons.edit, size: 16),
@@ -360,56 +362,73 @@ class _CoreDnsPageState extends State<CoreDnsPage> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final userRole = widget.state.currentUser?.role ?? 'admin';
+    final canEditRecords = userRole == 'admin' || userRole == 'operator';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Icon(Icons.dns_outlined, size: 28, color: theme.colorScheme.primary),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('CoreDNS Management Suite', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  Text('Cluster Service Discovery, Static Records & DNS Playground',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                  Icon(Icons.dns_outlined, size: 28, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('CoreDNS Management Suite', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                      Text('Cluster Service Discovery, Static Records & DNS Playground',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                    ],
+                  ),
                 ],
               ),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _restartingCoreDNS ? null : _restartCoreDNS,
-                icon: _restartingCoreDNS
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.restart_alt, size: 18),
-                label: Text(_restartingCoreDNS ? 'Restarting...' : 'Restart CoreDNS'),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  widget.onRefresh();
-                  _loadSuiteData();
-                },
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Refresh'),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: _showAddCustomRecordDialog,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('+ Add Static Record'),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _restartingCoreDNS ? null : _restartCoreDNS,
+                    icon: _restartingCoreDNS
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.restart_alt, size: 18),
+                    label: Text(_restartingCoreDNS ? 'Restarting...' : 'Restart CoreDNS'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      widget.onRefresh();
+                      _loadSuiteData();
+                    },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Refresh'),
+                  ),
+                  if (canEditRecords)
+                    FilledButton.icon(
+                      onPressed: _showAddCustomRecordDialog,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Static Record'),
+                    ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _buildSummaryCards(theme),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          if (widget.selectedSubIndex == 0) ...[
+            _buildSummaryCards(theme),
+            const SizedBox(height: 20),
+          ],
           if (_loadingData)
             const Center(child: Padding(padding: EdgeInsets.all(48), child: CircularProgressIndicator()))
           else
