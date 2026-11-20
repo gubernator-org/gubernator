@@ -43,6 +43,7 @@ jobs:
           cache: true
 
       - name: Build Binary
+        shell: bash
         env:
           CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
