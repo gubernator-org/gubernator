@@ -40,11 +40,28 @@ class _ParsedCategory {
 
 class _UpdateDialogState extends State<UpdateDialog> {
   bool _applying = false;
-  String _statusPhase = 'downloading'; // 'downloading', 'installing', 'restarting', 'success', 'failed'
+  String _statusPhase = 'downloading'; // 'downloading', 'verifying', 'installing', 'restarting', 'success', 'failed'
   String _statusMsg = 'Initiating cluster update...';
+  int _progressPercent = 0;
+  bool _sha256Verified = false;
+  bool _binaryVerified = false;
+  String _verifiedRunningVersion = '';
+  List<Map<String, dynamic>> _nodeResults = [];
+  bool _sawRestart = false;
+  int _postRestartMismatchPolls = 0;
   String? _error;
   Timer? _pollTimer;
   int _pollCount = 0;
+
+  String _normalizeVer(String v) => v.trim().replaceFirst(RegExp(r'^v'), '');
+
+  void _cacheBustedReload() {
+    final base = Uri.base.replace(queryParameters: {
+      ...Uri.base.queryParameters,
+      '_v': '${widget.latestVersion}-${DateTime.now().millisecondsSinceEpoch}',
+    });
+    html.window.location.assign(base.toString());
+  }
 
   @override
   void dispose() {
@@ -71,7 +88,14 @@ class _UpdateDialogState extends State<UpdateDialog> {
     setState(() {
       _applying = true;
       _statusPhase = 'downloading';
-      _statusMsg = 'Connecting to GitHub Releases & downloading binary...';
+      _statusMsg = 'Connecting to GitHub Releases & downloading compressed binary...';
+      _progressPercent = 0;
+      _sha256Verified = false;
+      _binaryVerified = false;
+      _verifiedRunningVersion = '';
+      _nodeResults = [];
+      _sawRestart = false;
+      _postRestartMismatchPolls = 0;
       _error = null;
       _pollCount = 0;
     });
@@ -95,66 +119,100 @@ class _UpdateDialogState extends State<UpdateDialog> {
           final status = st['status'] as String? ?? '';
           final msg = st['progress_message'] as String? ?? '';
           final errStr = st['error'] as String? ?? '';
+          final runningVer = st['running_version'] as String? ?? '';
+          final pct = (st['progress_percent'] as num?)?.toInt() ?? _progressPercent;
+          final shaOk = st['sha256_verified'] == true;
+          final binOk = st['binary_verified'] == true;
+          final rawNodes = st['node_results'];
+          final parsedNodes = rawNodes is List
+              ? rawNodes.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+              : _nodeResults;
 
           if (!mounted) return;
+
+          if (status == 'restarting') {
+            _sawRestart = true;
+          }
 
           if (status == 'failed') {
             _pollTimer?.cancel();
             setState(() {
               _statusPhase = 'failed';
+              _nodeResults = parsedNodes;
               _error = errStr.isNotEmpty ? errStr : 'Update failed during execution.';
             });
             return;
           }
 
-          if (status == 'success') {
+          final versionMatchesTarget = runningVer.isNotEmpty &&
+              _normalizeVer(runningVer) == _normalizeVer(widget.latestVersion);
+
+          // Confirmed success: either backend explicitly verified post-restart handoff
+          // OR Manager came back online reporting the exact target version!
+          if (status == 'success' || (_sawRestart && versionMatchesTarget)) {
             _pollTimer?.cancel();
             setState(() {
               _statusPhase = 'success';
-              _statusMsg = 'Cluster successfully upgraded to ${widget.latestVersion}!';
+              _progressPercent = 100;
+              _sha256Verified = _sha256Verified || shaOk;
+              _binaryVerified = true;
+              _verifiedRunningVersion = runningVer.isNotEmpty ? runningVer : widget.latestVersion;
+              _nodeResults = parsedNodes;
+              _statusMsg = 'Verified: Cluster is now running $_verifiedRunningVersion!';
             });
             widget.onUpdateTriggered();
-            Future.delayed(const Duration(milliseconds: 2000), () {
-              html.window.location.reload();
-            });
+            Future.delayed(const Duration(milliseconds: 2200), _cacheBustedReload);
             return;
           }
 
-          if (status.isNotEmpty) {
+          // Detect if Manager restarted back onto the OLD binary instead of hanging on 'idle'
+          if (_sawRestart && status == 'idle') {
+            if (runningVer.isNotEmpty && !versionMatchesTarget) {
+              _postRestartMismatchPolls++;
+              if (_postRestartMismatchPolls >= 3) {
+                _pollTimer?.cancel();
+                setState(() {
+                  _statusPhase = 'failed';
+                  _error =
+                      'Manager restarted on $runningVer instead of ${widget.latestVersion}. The binary at ExecStart may not have been replaced.';
+                });
+                return;
+              }
+            }
+            // Keep showing 'restarting' while waiting for verification poll
+            return;
+          }
+
+          if (status.isNotEmpty && status != 'idle') {
             setState(() {
               _statusPhase = status;
+              _progressPercent = pct.clamp(0, 100);
+              _sha256Verified = _sha256Verified || shaOk;
+              _binaryVerified = _binaryVerified || binOk;
+              _nodeResults = parsedNodes;
               if (msg.isNotEmpty) _statusMsg = msg;
             });
           }
         } catch (_) {
-          // Server might be rebooting during restart phase
-          if (mounted && _statusPhase != 'downloading') {
+          // Server is rebooting during restart phase
+          if (mounted && (_statusPhase == 'installing' || _statusPhase == 'restarting' || _sawRestart)) {
+            _sawRestart = true;
             setState(() {
               _statusPhase = 'restarting';
-              _statusMsg = 'Gubernator service is restarting... Reconnecting...';
+              _statusMsg = 'Gubernator Manager is restarting... Waiting to verify ${widget.latestVersion}...';
             });
           }
         }
 
-        // Failsafe timeout after 5 minutes (200 polls x 1.5s)
-        if (_pollCount > 200) {
+        // Failsafe timeout after 6 minutes (240 polls x 1.5s)
+        if (_pollCount > 240) {
           _pollTimer?.cancel();
           if (mounted) {
-            if (_statusPhase == 'restarting') {
-              setState(() {
-                _statusPhase = 'success';
-                _statusMsg = 'Update applied. Reloading dashboard...';
-              });
-              Future.delayed(const Duration(milliseconds: 1500), () {
-                html.window.location.reload();
-              });
-            } else {
-              setState(() {
-                _statusPhase = 'failed';
-                _error =
-                    'Update timed out while in phase "$_statusPhase". Check manager logs or update via CLI.';
-              });
-            }
+            setState(() {
+              _statusPhase = 'failed';
+              _error =
+                  'Update timed out while in phase "$_statusPhase". Check manager logs (`journalctl -u gbnt-manager -n 50`).';
+            });
           }
         }
       });
@@ -373,7 +431,21 @@ class _UpdateDialogState extends State<UpdateDialog> {
             color: isDark ? Colors.grey[300] : Colors.grey[700],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+
+        // Live determinate download progress bar
+        if (_statusPhase == 'downloading' && _progressPercent > 0) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: _progressPercent / 100.0,
+              minHeight: 7,
+              backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // Steps Progress Checklist Box
         Container(
@@ -386,31 +458,71 @@ class _UpdateDialogState extends State<UpdateDialog> {
           child: Column(
             children: [
               _buildStepItem(
-                label: '1. Download release binary from GitHub',
+                label: '1. Download compressed release binary from GitHub',
                 state: _getStepState(1),
                 isDark: isDark,
               ),
-              const Divider(height: 16),
+              const Divider(height: 14),
               _buildStepItem(
-                label: '2. Install binary on Manager & Centurion workers',
+                label: _sha256Verified
+                    ? '2. Verify SHA-256 checksum & binary self-test (verified)'
+                    : '2. Verify checksum & binary self-test',
                 state: _getStepState(2),
                 isDark: isDark,
               ),
-              const Divider(height: 16),
+              const Divider(height: 14),
               _buildStepItem(
-                label: '3. Restart Gubernator cluster daemon',
+                label: '3. Atomic install on Manager & LAN push to Centurion workers',
                 state: _getStepState(3),
                 isDark: isDark,
               ),
-              const Divider(height: 16),
+              const Divider(height: 14),
               _buildStepItem(
-                label: '4. Verify cluster health & reload dashboard',
+                label: '4. Restart Manager daemon',
                 state: _getStepState(4),
+                isDark: isDark,
+              ),
+              const Divider(height: 14),
+              _buildStepItem(
+                label: _verifiedRunningVersion.isNotEmpty
+                    ? '5. Post-restart verification ($_verifiedRunningVersion active)'
+                    : '5. Verify live version & reload dashboard',
+                state: _getStepState(5),
                 isDark: isDark,
               ),
             ],
           ),
         ),
+
+        // Per-node verification results (Manager + Workers)
+        if (_nodeResults.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: _nodeResults.map((nr) {
+              final nodeId = (nr['node_id'] ?? 'node').toString();
+              final st = (nr['status'] ?? 'pending').toString();
+              final ver = (nr['version'] ?? '').toString();
+              final color = st == 'verified'
+                  ? const Color(0xFF10B981)
+                  : (st == 'failed' ? Colors.redAccent : const Color(0xFFF97316));
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withValues(alpha: 0.35)),
+                ),
+                child: Text(
+                  ver.isNotEmpty ? '$nodeId · $ver ($st)' : '$nodeId ($st)',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
 
         if (_error != null) ...[
           const SizedBox(height: 16),
@@ -475,19 +587,17 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   int _getStepState(int stepNum) {
     if (_statusPhase == 'failed') return -1;
-    if (_statusPhase == 'success') return 2; // completed
+    if (_statusPhase == 'success') return 2;
 
-    if (stepNum == 1) {
-      return _statusPhase == 'downloading' ? 1 : 2;
-    } else if (stepNum == 2) {
-      if (_statusPhase == 'downloading') return 0;
-      return _statusPhase == 'installing' ? 1 : 2;
-    } else if (stepNum == 3) {
-      if (_statusPhase == 'downloading' || _statusPhase == 'installing') return 0;
-      return _statusPhase == 'restarting' ? 1 : 2;
-    } else if (stepNum == 4) {
-      return _statusPhase == 'success' ? 2 : 0;
-    }
+    const order = {
+      'downloading': 1,
+      'verifying': 2,
+      'installing': 3,
+      'restarting': 4,
+    };
+    final activeStep = order[_statusPhase] ?? 1;
+    if (stepNum < activeStep) return 2;
+    if (stepNum == activeStep) return 1;
     return 0;
   }
 

@@ -22,10 +22,16 @@ lint:
 swagger:
 	swag init -g cmd/gbnt/main.go -o docs
 
-## flutter: build Flutter Web dashboard and copy assets to internal/web/flutter
+## flutter: build Flutter Web dashboard and copy assets to internal/web/flutter (trimming unused Wasm/debug symbols)
 flutter:
 	cd web-ui && flutter build web --release --base-href "/"
+	rm -rf internal/web/flutter/*
 	cp -R web-ui/build/web/* internal/web/flutter/
+	rm -rf internal/web/flutter/canvaskit/skwasm* \
+	       internal/web/flutter/canvaskit/wimp* \
+	       internal/web/flutter/canvaskit/experimental_webparagraph \
+	       internal/web/flutter/canvaskit/*.symbols \
+	       internal/web/flutter/canvaskit/chromium/*.symbols
 
 ## docker: build and tag the Docker image for the current platform
 docker:

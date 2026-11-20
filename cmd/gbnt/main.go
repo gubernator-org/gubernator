@@ -14,17 +14,25 @@ import (
 // @host            localhost:4002
 // @BasePath        /
 
-var version = "v4.1.0"
+// version is injected at compile time via `-ldflags "-X main.version=vX.Y.Z"`.
+var version = "dev"
 
 func init() {
-	for _, p := range []string{"VERSION", "/data/VERSION", "/app/VERSION", "../VERSION"} {
-		if data, err := os.ReadFile(p); err == nil {
-			v := strings.TrimSpace(string(data))
-			if v != "" && strings.HasPrefix(v, "v") {
-				version = v
-				break
+	// Only fall back to disk VERSION files in local `go run` dev builds.
+	// Release binaries built with `-X main.version=vX.Y.Z` MUST always report their true compiled version.
+	if version == "" || version == "dev" {
+		for _, p := range []string{"VERSION", "/data/VERSION", "/app/VERSION", "../VERSION"} {
+			if data, err := os.ReadFile(p); err == nil {
+				v := strings.TrimSpace(string(data))
+				if v != "" && strings.HasPrefix(v, "v") {
+					version = v
+					break
+				}
 			}
 		}
+	}
+	if version == "" || version == "dev" {
+		version = "v4.1.4"
 	}
 	cli.Version = version
 	web.Version = version

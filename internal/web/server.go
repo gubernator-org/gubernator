@@ -1200,7 +1200,7 @@ func updateCheckHandler(c *gin.Context) {
 }
 
 func updateStatusHandler(c *gin.Context) {
-	status := updater.GetUpdateStatus()
+	status := updater.GetUpdateStatusWithVersion(GetVersion())
 	c.JSON(http.StatusOK, status)
 }
 

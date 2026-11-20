@@ -48,13 +48,18 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -v -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o gbnt-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/gbnt
+          OUT="gbnt-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}"
+          go build -v -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o "${OUT}" ./cmd/gbnt
+          gzip -k -6 "${OUT}"
+          ls -lh "${OUT}" "${OUT}.gz"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: gbnt-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          path: |
+            gbnt-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+            gbnt-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.gz
 
   release:
     name: Publish Release & Changelog
@@ -73,6 +78,12 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Generate SHA-256 Checksums
+        run: |
+          cd dist
+          sha256sum gbnt-* > checksums.txt
+          cat checksums.txt
 
       - name: Generate Descriptive Changelog
         id: changelog
