@@ -1,6 +1,18 @@
 part of '../legions_page.dart';
 
-/// Data model for a single ingress route displayed in the Cluster Topology canvas.
+/// Deterministic accent palette for visually pairing each Stack with its containers & edges.
+const List<Color> _kStackPalette = [
+  Color(0xFF6366F1), // Indigo
+  Color(0xFF0EA5E9), // Sky
+  Color(0xFF10B981), // Emerald
+  Color(0xFFEC4899), // Pink
+  Color(0xFF8B5CF6), // Violet
+  Color(0xFF14B8A6), // Teal
+  Color(0xFFF59E0B), // Amber
+  Color(0xFFEF4444), // Red
+];
+
+/// Data model for a single ingress route displayed in Column 1 of the Cluster Topology canvas.
 class _TopoIngressNode {
   final String id;
   final String host;
@@ -27,7 +39,37 @@ class _TopoIngressNode {
       upstreams.isNotEmpty ? upstreams.join(', ') : 'caddy-proxy';
 }
 
-/// Data model for a container (or stopped/unscheduled service) card rendered inside a Centurion host box.
+/// Data model for a Stack (Legion) card displayed in Column 2 of the Cluster Topology canvas.
+class _TopoStackNode {
+  final String id;
+  final String stackId;
+  final String name;
+  final Color accentColor;
+  final int totalServices;
+  final int runningContainers;
+  final int totalContainers;
+  final List<String> hostNodeIds;
+  final List<String> containerIds;
+  final bool isBase;
+  final bool isUnmanaged;
+  Rect rect = Rect.zero;
+
+  _TopoStackNode({
+    required this.id,
+    required this.stackId,
+    required this.name,
+    required this.accentColor,
+    required this.totalServices,
+    required this.runningContainers,
+    required this.totalContainers,
+    required this.hostNodeIds,
+    required this.containerIds,
+    this.isBase = false,
+    this.isUnmanaged = false,
+  });
+}
+
+/// Data model for a container (or stopped/unscheduled service) card rendered inside a Centurion host box (Column 3).
 class _TopoContainerNode {
   final String id;
   final String name;
@@ -35,6 +77,7 @@ class _TopoContainerNode {
   final String serviceName;
   final String stackId;
   final String stackName;
+  final Color stackColor;
   final String nodeId;
   final String image;
   final String status;
@@ -54,6 +97,7 @@ class _TopoContainerNode {
     required this.serviceName,
     required this.stackId,
     required this.stackName,
+    required this.stackColor,
     required this.nodeId,
     required this.image,
     required this.status,
@@ -69,7 +113,7 @@ class _TopoContainerNode {
   bool get isRunning => status.toLowerCase() == 'running';
 }
 
-/// Data model for a Centurion host container box on the canvas.
+/// Data model for a Centurion host container box on the canvas (Column 3).
 class _TopoHostBox {
   final Node node;
   final List<_TopoContainerNode> containers;
@@ -85,7 +129,10 @@ class _TopoHostBox {
   });
 }
 
-/// Directed edge between two topology nodes (Ingress -> Container/Host or Container -> Container).
+/// Directed edge between two topology nodes:
+/// - Ingress -> Stack (or fallback Host/Container)
+/// - Stack -> Container (inside Manager / Worker Centurion hosts)
+/// - Container -> Container (same-host NET or cross-host MESH)
 class _TopoEdge {
   final String fromId;
   final String toId;
@@ -96,7 +143,7 @@ class _TopoEdge {
   final Color color;
   final String label;
   final bool dashed;
-  final String kind; // 'ingress', 'service', 'cross-host'
+  final String kind; // 'ingress', 'stack', 'service', 'cross-host'
 
   const _TopoEdge({
     required this.fromId,
@@ -149,10 +196,10 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       TransformationController();
 
   bool _showBaseStacks = false;
-  bool _showUnmanaged = true;
+  bool _showUnmanaged = false; // Default OFF so count matches Legions -> Deployed 1:1
   bool _showServiceLinks = true;
   String _selectedStackFilter = 'ALL';
-  String? _selectedNodeId; // Selected ingress or container ID for highlighting
+  String? _selectedNodeId; // Selected ingress, stack, or container ID for highlighting
   double _currentScale = 1.0;
 
   bool _loadingExtras = false;
@@ -240,7 +287,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     );
 
     if (trimmed.isEmpty || trimmed == 'node-local-manager') {
-      // Exact check first in case a node really is named node-local-manager
       for (final n in nodesList) {
         if (n.id == trimmed) return n.id;
       }
@@ -333,18 +379,16 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       for (final segment in raw.split(',')) {
         var s = segment.trim();
         if (s.isEmpty) continue;
-        // Strip protocol suffix like /tcp, /udp
         final slashIdx = s.indexOf('/');
         if (slashIdx != -1) s = s.substring(0, slashIdx).trim();
 
         if (s.contains('->')) {
-          // docker ps format: 0.0.0.0:8080->80 or [::]:8080->80
           final left = s.split('->').first.trim();
           final lastColon = left.lastIndexOf(':');
-          final hp = lastColon != -1 ? left.substring(lastColon + 1).trim() : left;
+          final hp =
+              lastColon != -1 ? left.substring(lastColon + 1).trim() : left;
           if (RegExp(r'^\d+$').hasMatch(hp)) result.add(hp);
         } else {
-          // compose format: 8080:80 or 0.0.0.0:8080:80
           final parts = s.split(':');
           if (parts.length == 2) {
             final hp = parts[0].trim();
@@ -461,7 +505,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
         }
       }
 
-      // Also detect URL/host references inside environment lines (e.g. http://api:5678 or REDIS_HOST=cache)
       for (final other in serviceNames) {
         if (other == currentService || other.length < 2) continue;
         final pattern = RegExp(
@@ -474,33 +517,34 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
     }
 
-    // Deduplicate
     final seen = <String>{};
     return deps.where((e) => seen.add('${e.$1}->${e.$2}')).toList();
   }
 
-  /// Extracts a mapping of normalized `ingressHost -> List<Service>` across all visible stacks
+  /// Extracts a mapping of normalized `ingressHost -> List<Service>` across stacks
   /// by inspecting both `Service.constraints` (the exact source used by `GenerateCaddyfile()`)
   /// and per-service sections of `StackModel.rawComposeFile`.
   Map<String, List<Service>> _buildHostToServicesMap(
-    List<StackModel> visibleStacks,
+    List<StackModel> stacks,
     List<Service> allServices,
   ) {
     final map = <String, List<Service>>{};
-    final visibleStackIds = visibleStacks.map((s) => s.id).toSet();
+    final stackIds = stacks.map((s) => s.id).toSet();
 
     void addMapping(String rawHost, Service svc) {
-      final clean = _stripScheme(rawHost).toLowerCase();
-      if (clean.isEmpty) return;
-      final list = map.putIfAbsent(clean, () => <Service>[]);
-      if (!list.any((s) => s.id == svc.id)) {
-        list.add(svc);
+      for (final part in rawHost.split(',')) {
+        final clean = _stripScheme(part).toLowerCase();
+        if (clean.isEmpty) continue;
+        final list = map.putIfAbsent(clean, () => <Service>[]);
+        if (!list.any((s) => s.id == svc.id)) {
+          list.add(svc);
+        }
       }
     }
 
     // 1. Authoritative Service.constraints (same keys as internal/aqueducts/ingress.go)
     for (final svc in allServices) {
-      if (!visibleStackIds.contains(svc.stackId)) continue;
+      if (!stackIds.contains(svc.stackId)) continue;
       for (final constraint in svc.constraints) {
         String key = '';
         String val = '';
@@ -532,7 +576,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       caseSensitive: false,
     );
 
-    for (final stack in visibleStacks) {
+    for (final stack in stacks) {
       if (stack.rawComposeFile.trim().isEmpty) continue;
       final stackServices =
           allServices.where((s) => s.stackId == stack.id).toList();
@@ -598,6 +642,39 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     return s.trim();
   }
 
+  /// Normalizes a Caddy site block header (which may be comma-separated like
+  /// `http://app.gbnt.local, app.gbnt.local`) into a list of clean hostnames.
+  List<String> _extractRouteHosts(String rawHost, String cleanHostRaw) {
+    final source = cleanHostRaw.isNotEmpty ? cleanHostRaw : rawHost;
+    final hosts = <String>[];
+    for (final part in source.split(',')) {
+      var h = _stripScheme(part);
+      // Strip trailing :80 or :443 port if present on hostname
+      if (h.endsWith(':80')) h = h.substring(0, h.length - 3);
+      if (h.endsWith(':443')) h = h.substring(0, h.length - 4);
+      h = h.trim();
+      if (h.isEmpty || h == ':80' || h == ':443') continue;
+      if (!hosts.any((e) => e.toLowerCase() == h.toLowerCase())) {
+        hosts.add(h);
+      }
+    }
+    return hosts;
+  }
+
+  bool _isSystemBaseHost(String hostLower) {
+    const prefixes = [
+      'grafana.',
+      'jaeger.',
+      'prometheus.',
+      'loki.',
+      'scope.',
+      'cadvisor.',
+      'alertmanager.',
+      'opensearch.',
+    ];
+    return prefixes.any((p) => hostLower.startsWith(p));
+  }
+
   /// Splits an upstream address like `http://192.168.1.51:8080` or `172.18.0.5:80`
   /// into `(host, port)`.
   (String, String) _parseUpstreamHostPort(String raw) {
@@ -614,10 +691,10 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     return (clean.toLowerCase(), '');
   }
 
-  /// Collects live Caddy routes + compose-declared ingress routes and accurately links them
-  /// to ALL matching containers across Manager and Worker nodes (including multi-replica &
-  /// Worker Caddy `:80` proxies).
+  /// Collects live Caddy routes + compose-declared ingress routes, filtering out hidden Base Stack
+  /// routes when `Base Stacks` is OFF, and linking each route to its owning Stack(s) & Container(s).
   List<_TopoIngressNode> _collectIngressNodes({
+    required List<StackModel> allStacks,
     required List<StackModel> visibleStacks,
     required List<Service> allServices,
     required List<_TopoContainerNode> allContainers,
@@ -626,9 +703,13 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     final nodes = <_TopoIngressNode>[];
     final seenHosts = <String>{};
     final nodeById = {for (final n in nodesList) n.id: n};
-    final hostToServices = _buildHostToServicesMap(visibleStacks, allServices);
+    final visibleStackIds = visibleStacks.map((s) => s.id).toSet();
 
-    // Precompute published host ports per container for fast upstream matching
+    // Build host->services map across ALL stacks so we know when a route belongs to a hidden Base Stack
+    final allHostToServices = _buildHostToServicesMap(allStacks, allServices);
+    final visibleHostToServices =
+        _buildHostToServicesMap(visibleStacks, allServices);
+
     final containerHostPorts = {
       for (final c in allContainers) c.id: _extractHostPorts(c.ports),
     };
@@ -639,17 +720,11 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       final rawHost =
           (r['host'] ?? r['domain'] ?? r['match'] ?? '').toString().trim();
       final cleanHostRaw = (r['clean_host'] ?? '').toString().trim();
-      final cleanHost =
-          cleanHostRaw.isNotEmpty ? cleanHostRaw : _stripScheme(rawHost);
-      final hostKey = cleanHost.toLowerCase();
+      final routeHosts = _extractRouteHosts(rawHost, cleanHostRaw);
+      if (routeHosts.isEmpty) continue;
 
-      if (cleanHost.isEmpty ||
-          rawHost == ':80' ||
-          rawHost == ':443' ||
-          cleanHost == ':80' ||
-          cleanHost == ':443') {
-        continue;
-      }
+      final primaryHost = routeHosts.first;
+      final hostKey = primaryHost.toLowerCase();
       if (!seenHosts.add(hostKey)) continue;
 
       // Read plural `upstreams` array (actual backend format) with fallback to singular fields
@@ -670,6 +745,20 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
         }
       }
 
+      // Check if this route belongs strictly to hidden Base Stacks
+      final allDeclaredForHost = <Service>[];
+      final visibleDeclaredForHost = <Service>[];
+      for (final rh in routeHosts) {
+        final k = rh.toLowerCase();
+        allDeclaredForHost.addAll(allHostToServices[k] ?? const <Service>[]);
+        visibleDeclaredForHost
+            .addAll(visibleHostToServices[k] ?? const <Service>[]);
+      }
+      if (allDeclaredForHost.isNotEmpty && visibleDeclaredForHost.isEmpty) {
+        // Route belongs exclusively to a filtered-out stack (e.g. Base Stack when Base Stacks is OFF)
+        continue;
+      }
+
       final matchedContainerIds = <String>[];
       final matchedStackIds = <String>{};
       String matchedHostNodeId = '';
@@ -683,9 +772,8 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
 
       // Strategy A (Authoritative): Match via Service.constraints & Compose ingress.host
-      // Works seamlessly for Manager, Worker 01 (even when proxied via workerIP:80), and multi-replica!
-      final declaredServices = hostToServices[hostKey] ?? const <Service>[];
-      for (final svc in declaredServices) {
+      for (final svc in visibleDeclaredForHost) {
+        matchedStackIds.add(svc.stackId);
         for (final c in allContainers) {
           if ((c.serviceId.isNotEmpty && c.serviceId == svc.id) ||
               (c.stackId == svc.stackId && c.serviceName == svc.name)) {
@@ -699,14 +787,12 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
         final (uHost, uPort) = _parseUpstreamHostPort(u);
         if (uHost.isEmpty) continue;
 
-        // Track if this upstream points to a specific Centurion node IP (e.g. Worker 01)
         for (final n in nodesList) {
           if (n.ip.isNotEmpty && n.ip.toLowerCase() == uHost) {
             if (matchedHostNodeId.isEmpty) matchedHostNodeId = n.id;
           }
         }
 
-        // Match containers by internal Docker IP, Centurion node IP + published hostPort, or container/service name
         for (final c in allContainers) {
           final matchesContainerIp =
               c.ip.isNotEmpty && c.ip.toLowerCase() == uHost;
@@ -725,10 +811,11 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
         }
       }
 
-      // Strategy C: DNS record fallback (if route host has a CoreDNS A-record to a container or worker IP)
+      // Strategy C: DNS record fallback
       if (matchedContainerIds.isEmpty) {
         for (final dns in widget.state.dnsRecords) {
-          if (dns.hostname.trim().toLowerCase() != hostKey) continue;
+          final dnsHost = dns.hostname.trim().toLowerCase();
+          if (!routeHosts.any((rh) => rh.toLowerCase() == dnsHost)) continue;
           final dnsIp = dns.ip.trim().toLowerCase();
           if (dnsIp.isEmpty) continue;
           for (final c in allContainers) {
@@ -747,12 +834,21 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
         }
       }
 
+      // Hide unmatched system/observability Caddy routes when Base Stacks filter is OFF
+      if (!_showBaseStacks &&
+          _selectedStackFilter == 'ALL' &&
+          matchedStackIds.isEmpty &&
+          _isSystemBaseHost(hostKey)) {
+        continue;
+      }
+
       // Respect Focus Stack filter
       if (_selectedStackFilter != 'ALL') {
-        final matchesFocusedStack =
-            matchedStackIds.contains(_selectedStackFilter) ||
-                declaredServices.any((s) => s.stackId == _selectedStackFilter);
-        if (!matchesFocusedStack) continue;
+        if (!matchedStackIds.contains(_selectedStackFilter)) continue;
+      } else {
+        // Keep only stackIds that are actually visible in Column 2
+        matchedStackIds.retainWhere((sid) =>
+            visibleStackIds.contains(sid) || sid.startsWith('unmanaged::'));
       }
 
       final scheme = (r['scheme'] ?? '').toString().toLowerCase();
@@ -762,8 +858,8 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
 
       nodes.add(_TopoIngressNode(
         id: 'ingress-caddy-$i',
-        host: cleanHost,
-        cleanHost: cleanHost,
+        host: primaryHost,
+        cleanHost: primaryHost,
         upstreams: upstreams,
         targetContainerIds: matchedContainerIds,
         targetStackIds: matchedStackIds,
@@ -772,8 +868,8 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       ));
     }
 
-    // 2. Compose/Constraint-declared ingress hosts not yet present in live Caddy routes
-    for (final entry in hostToServices.entries) {
+    // 2. Compose/Constraint-declared ingress hosts on visible stacks not yet in live Caddy routes
+    for (final entry in visibleHostToServices.entries) {
       final hostKey = entry.key;
       if (!seenHosts.add(hostKey)) continue;
 
@@ -821,7 +917,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
   }
 
   /// Computes smart anchor points and Bézier control points between two rects
-  /// so edges connect cleanly regardless of relative position (left/right/above/below/cross-host).
+  /// so edges connect cleanly regardless of relative position.
   _TopoEdge _buildSmartEdge({
     required String fromId,
     required String toId,
@@ -842,11 +938,10 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       from = Offset(fromRect.right, fromRect.center.dy);
       to = Offset(toRect.left, toRect.center.dy);
       final dx = (to.dx - from.dx).abs();
-      final ctrl = math.max(52.0, dx * 0.45);
+      final ctrl = math.max(44.0, dx * 0.44);
       c1 = Offset(from.dx + ctrl, from.dy);
       c2 = Offset(to.dx - ctrl, to.dy);
     } else if (toRect.left >= fromRect.right - 8) {
-      // Target is to the right of source
       from = Offset(fromRect.right, fromRect.center.dy);
       to = Offset(toRect.left, toRect.center.dy);
       final dx = (to.dx - from.dx).abs();
@@ -854,7 +949,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       c1 = Offset(from.dx + ctrl, from.dy);
       c2 = Offset(to.dx - ctrl, to.dy);
     } else if (fromRect.left >= toRect.right - 8) {
-      // Target is to the left of source
       from = Offset(fromRect.left, fromRect.center.dy);
       to = Offset(toRect.right, toRect.center.dy);
       final dx = (from.dx - to.dx).abs();
@@ -862,7 +956,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       c1 = Offset(from.dx - ctrl, from.dy);
       c2 = Offset(to.dx + ctrl, to.dy);
     } else if (toRect.top >= fromRect.bottom - 8) {
-      // Target is below source (same column or cross-host below)
       from = Offset(fromRect.center.dx, fromRect.bottom);
       to = Offset(toRect.center.dx, toRect.top);
       final dy = (to.dy - from.dy).abs();
@@ -870,7 +963,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       c1 = Offset(from.dx, from.dy + ctrl);
       c2 = Offset(to.dx, to.dy - ctrl);
     } else {
-      // Target is above source
       from = Offset(fromRect.center.dx, fromRect.top);
       to = Offset(toRect.center.dx, toRect.bottom);
       final dy = (from.dy - to.dy).abs();
@@ -922,7 +1014,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
             ),
           ];
 
-    // 2. Filter visible stacks (always include focused stack even if Base Stacks chip is off)
+    // 2. Filter visible stacks (matches Legions -> Deployed 1:1 when Base Stacks is OFF)
     final allStacks = widget.state.stacks;
     final baseStackCount = allStacks.where(widget.isBaseStackFn).length;
     final stackById = {for (final s in allStacks) s.id: s};
@@ -934,8 +1026,16 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
       if (!_showBaseStacks && widget.isBaseStackFn(s)) return false;
       return true;
-    }).toList();
+    }).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     final visibleStackIds = visibleStacks.map((s) => s.id).toSet();
+
+    // Assign a deterministic accent color per visible stack
+    final stackColorById = <String, Color>{};
+    for (int i = 0; i < visibleStacks.length; i++) {
+      stackColorById[visibleStacks[i].id] =
+          _kStackPalette[i % _kStackPalette.length];
+    }
 
     // 3. Build container nodes from managed tasks
     final containers = <_TopoContainerNode>[];
@@ -960,6 +1060,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
         serviceName: svc.name,
         stackId: stack.id,
         stackName: stack.name,
+        stackColor: stackColorById[stack.id] ?? _kStackPalette.first,
         nodeId: resolvedNodeId,
         image: svc.image,
         status: task.status,
@@ -971,8 +1072,9 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       ));
     }
 
-    // 3b. Ensure EVERY visible stack & service appears even if it currently has 0 tasks (stopped/pending)
+    // 3b. Ensure EVERY visible stack & service appears even if it currently has 0 tasks
     for (final stack in visibleStacks) {
+      final color = stackColorById[stack.id] ?? _kStackPalette.first;
       final stackServices =
           widget.state.services.where((s) => s.stackId == stack.id).toList();
       if (stackServices.isNotEmpty) {
@@ -987,6 +1089,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
             serviceName: svc.name,
             stackId: stack.id,
             stackName: stack.name,
+            stackColor: color,
             nodeId: targetNodeId,
             image: svc.image.isNotEmpty ? svc.image : 'No active container',
             status: 'stopped',
@@ -1006,6 +1109,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
           serviceName: stack.name,
           stackId: stack.id,
           stackName: stack.name,
+          stackColor: color,
           nodeId: targetNodeId,
           image: 'No services/tasks deployed',
           status: 'stopped',
@@ -1019,22 +1123,27 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
     }
 
-    // 4. Optionally include Unmanaged / Discovered containers
+    // 4. Optionally include Unmanaged / Discovered containers (when Unmanaged chip is ON)
+    final unmanagedGroupNames = <String, String>{};
     if (_showUnmanaged && _selectedStackFilter == 'ALL') {
       for (final u in _unmanagedContainers) {
         final name = (u['name'] ?? '').toString();
         final rawNodeId = (u['node_id'] ?? u['node_ip'] ?? '').toString();
         final resolvedNodeId = _resolveNodeId(rawNodeId, nodesList);
         final groupName = (u['group_name'] ?? 'standalone').toString();
+        final groupStackId = 'unmanaged::$groupName';
+        final displayGroupName = groupName == 'standalone'
+            ? 'Unmanaged (Standalone)'
+            : 'Unmanaged · $groupName';
+        unmanagedGroupNames[groupStackId] = displayGroupName;
         final portsStr = (u['ports'] ?? '').toString();
         containers.add(_TopoContainerNode(
           id: 'unmanaged-$resolvedNodeId-$name',
           name: name,
           serviceName: (u['compose_service'] ?? name).toString(),
-          stackId: 'unmanaged::$groupName',
-          stackName: groupName == 'standalone'
-              ? 'Unmanaged (Standalone)'
-              : 'Unmanaged · $groupName',
+          stackId: groupStackId,
+          stackName: displayGroupName,
+          stackColor: const Color(0xFFF59E0B),
           nodeId: resolvedNodeId,
           image: (u['image'] ?? '').toString(),
           status: (u['state'] ?? 'unknown').toString(),
@@ -1047,15 +1156,54 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
     }
 
-    // 5. Collect Ingress nodes (after all managed/placeholder/unmanaged containers exist)
+    // 5. Build Stack Nodes for Column 2 (exact match to visibleStacks + optional unmanaged groups)
+    final stackNodes = <_TopoStackNode>[];
+    for (final stack in visibleStacks) {
+      final stackCtrs = containers.where((c) => c.stackId == stack.id).toList();
+      final stackSvcs =
+          widget.state.services.where((s) => s.stackId == stack.id).toList();
+      final hosts = stackCtrs.map((c) => c.nodeId).toSet().toList()..sort();
+      stackNodes.add(_TopoStackNode(
+        id: 'stack-${stack.id}',
+        stackId: stack.id,
+        name: stack.name,
+        accentColor: stackColorById[stack.id] ?? _kStackPalette.first,
+        totalServices: stackSvcs.length,
+        runningContainers: stackCtrs.where((c) => c.isRunning).length,
+        totalContainers: stackCtrs.length,
+        hostNodeIds: hosts,
+        containerIds: stackCtrs.map((c) => c.id).toList(),
+        isBase: widget.isBaseStackFn(stack),
+      ));
+    }
+    for (final entry in unmanagedGroupNames.entries) {
+      final groupCtrs =
+          containers.where((c) => c.stackId == entry.key).toList();
+      final hosts = groupCtrs.map((c) => c.nodeId).toSet().toList()..sort();
+      stackNodes.add(_TopoStackNode(
+        id: 'stack-${entry.key}',
+        stackId: entry.key,
+        name: entry.value,
+        accentColor: const Color(0xFFF59E0B),
+        totalServices: groupCtrs.length,
+        runningContainers: groupCtrs.where((c) => c.isRunning).length,
+        totalContainers: groupCtrs.length,
+        hostNodeIds: hosts,
+        containerIds: groupCtrs.map((c) => c.id).toList(),
+        isUnmanaged: true,
+      ));
+    }
+
+    // 6. Collect Ingress nodes (Column 1)
     final ingressNodes = _collectIngressNodes(
+      allStacks: allStacks,
       visibleStacks: visibleStacks,
       allServices: widget.state.services,
       allContainers: containers,
       nodesList: nodesList,
     );
 
-    // 6. Group containers into Centurion Host boxes (guaranteeing ZERO orphaned containers)
+    // 7. Group containers into Centurion Host boxes (Column 3, zero orphaned containers)
     final hostBoxes = <_TopoHostBox>[];
     final knownNodeIds = <String>{};
     for (final n in nodesList) {
@@ -1072,7 +1220,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       ));
     }
 
-    // Create synthetic host boxes for any containers referencing an offline/unregistered nodeId
     final orphanNodeIds = containers
         .map((c) => c.nodeId)
         .where((nid) => !knownNodeIds.contains(nid))
@@ -1096,15 +1243,24 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       ));
     }
 
-    // 7. Compute deterministic layout coordinates for canvas
+    // 8. Compute deterministic 3-column layout coordinates
     const double leftMargin = 28;
     const double topMargin = 28;
+
+    // Column 1: Ingress Routes
     const double ingressColX = leftMargin;
-    const double ingressCardW = 248;
+    const double ingressCardW = 236;
     const double ingressCardH = 74;
     const double ingressGapY = 16;
 
-    const double hostColX = ingressColX + ingressCardW + 136;
+    // Column 2: Legions (Stacks)
+    const double stackColX = ingressColX + ingressCardW + 96;
+    const double stackCardW = 240;
+    const double stackCardH = 84;
+    const double stackGapY = 18;
+
+    // Column 3: Centurion Hosts & Containers
+    const double hostColX = stackColX + stackCardW + 108;
     const double hostWidth = 636;
     const double hostHeaderH = 68;
     const double containerCardW = 284;
@@ -1115,7 +1271,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     const double hostPadBottom = 22;
     const double hostGapY = 32;
 
-    // Layout Ingress cards (left column)
+    // Layout Column 1: Ingress cards
     double ingressY = topMargin + 56;
     for (final ing in ingressNodes) {
       ing.rect =
@@ -1123,8 +1279,15 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       ingressY += ingressCardH + ingressGapY;
     }
 
-    // Layout Host boxes & their containers (right area)
-    double hostY = topMargin;
+    // Layout Column 2: Stack cards
+    double stackY = topMargin + 56;
+    for (final st in stackNodes) {
+      st.rect = Rect.fromLTWH(stackColX, stackY, stackCardW, stackCardH);
+      stackY += stackCardH + stackGapY;
+    }
+
+    // Layout Column 3: Host boxes & their containers
+    double hostY = topMargin + 56;
     final hostBoxByNodeId = <String, _TopoHostBox>{};
     for (final box in hostBoxes) {
       final count = box.containers.length;
@@ -1151,37 +1314,39 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     }
 
     final canvasWidth = hostColX + hostWidth + 48;
-    final canvasHeight = (hostY > ingressY ? hostY : ingressY) + 48;
+    final maxColY = math.max(hostY, math.max(stackY, ingressY));
+    final canvasHeight = maxColY + 48;
 
-    // 8. Build topology edges
+    // 9. Build 3-tier topology edges
     final edges = <_TopoEdge>[];
     final containerById = {for (final c in containers) c.id: c};
+    final stackNodeByStackId = {for (final s in stackNodes) s.stackId: s};
+    final stackNodeById = {for (final s in stackNodes) s.id: s};
 
-    // 8a. Ingress -> Container(s) (or targeted Centurion Host fallback)
+    // 9a. Column 1 -> Column 2: Ingress -> Stack(s) (or fallback to Centurion Host if unmatched)
     for (final ing in ingressNodes) {
-      final matchedTargets = ing.targetContainerIds
-          .map((id) => containerById[id])
-          .whereType<_TopoContainerNode>()
+      final matchedStackNodes = ing.targetStackIds
+          .map((sid) => stackNodeByStackId[sid])
+          .whereType<_TopoStackNode>()
           .toList();
 
-      if (matchedTargets.isNotEmpty) {
-        for (final target in matchedTargets) {
+      if (matchedStackNodes.isNotEmpty) {
+        for (final stNode in matchedStackNodes) {
           edges.add(_buildSmartEdge(
             fromId: ing.id,
-            toId: target.id,
+            toId: stNode.id,
             fromRect: ing.rect,
-            toRect: target.rect,
+            toRect: stNode.rect,
             color: const Color(0xFFF97316),
             label: ing.isTls ? 'HTTPS' : 'HTTP',
-            dashed: target.isPlaceholder,
+            dashed: false,
             kind: 'ingress',
             forceHorizontalRightToLeft: true,
           ));
         }
       } else if (hostBoxes.isNotEmpty) {
-        // Connect to the specific Centurion host referenced by upstream (e.g. Worker 01),
-        // falling back to Manager only if no host IP matched.
-        final targetBox = hostBoxByNodeId[ing.targetHostNodeId] ?? hostBoxes.first;
+        final targetBox =
+            hostBoxByNodeId[ing.targetHostNodeId] ?? hostBoxes.first;
         final headerAnchorRect = Rect.fromLTWH(
           targetBox.rect.left,
           targetBox.rect.top + 10,
@@ -1202,7 +1367,26 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
     }
 
-    // 8b. Inter-service dependency edges (parsed from Compose depends_on, links & env URLs)
+    // 9b. Column 2 -> Column 3: Stack -> EVERY Container belonging to that Stack (across Manager & Workers!)
+    for (final stNode in stackNodes) {
+      for (final cid in stNode.containerIds) {
+        final target = containerById[cid];
+        if (target == null) continue;
+        edges.add(_buildSmartEdge(
+          fromId: stNode.id,
+          toId: target.id,
+          fromRect: stNode.rect,
+          toRect: target.rect,
+          color: stNode.accentColor,
+          label: target.nodeId,
+          dashed: target.isPlaceholder,
+          kind: 'stack',
+          forceHorizontalRightToLeft: true,
+        ));
+      }
+    }
+
+    // 9c. Column 3 -> Column 3: Inter-service dependency edges (NET / MESH)
     if (_showServiceLinks) {
       for (final stack in visibleStacks) {
         final stackServices = widget.state.services
@@ -1236,9 +1420,33 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       }
     }
 
-    // Selected container or ingress for inspector side panel
+    // Compute transitive highlight set when a node is selected (so clicking Ingress highlights Stack + Containers too!)
+    final highlightedNodeIds = <String>{};
+    if (_selectedNodeId != null) {
+      highlightedNodeIds.add(_selectedNodeId!);
+      // Direct neighbors
+      for (final e in edges) {
+        if (e.fromId == _selectedNodeId) highlightedNodeIds.add(e.toId);
+        if (e.toId == _selectedNodeId) highlightedNodeIds.add(e.fromId);
+      }
+      // If an Ingress was selected, also highlight its Stack -> Container edges
+      if (ingressNodes.any((i) => i.id == _selectedNodeId)) {
+        final stackNeighbors = highlightedNodeIds
+            .where((id) => stackNodeById.containsKey(id))
+            .toList();
+        for (final sid in stackNeighbors) {
+          for (final e in edges) {
+            if (e.fromId == sid) highlightedNodeIds.add(e.toId);
+          }
+        }
+      }
+    }
+
+    // Selected node for inspector side panel
     final selectedContainer =
         _selectedNodeId != null ? containerById[_selectedNodeId] : null;
+    final selectedStack =
+        _selectedNodeId != null ? stackNodeById[_selectedNodeId] : null;
     final selectedIngress = _selectedNodeId != null
         ? ingressNodes.where((e) => e.id == _selectedNodeId).firstOrNull
         : null;
@@ -1298,7 +1506,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  // Stack selector
                   SizedBox(
                     width: 190,
                     child: DropdownButtonFormField<String>(
@@ -1399,13 +1606,12 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
             spacing: 16,
             runSpacing: 6,
             children: [
-              _legendDot(
-                  const Color(0xFFF97316), 'Load Balancing / Ingress Route'),
+              _legendDot(const Color(0xFFF97316), 'Ingress ➔ Stack Route'),
+              _legendDot(const Color(0xFF6366F1), 'Stack ➔ Container Placement'),
               _legendDot(const Color(0xFF38BDF8), 'Internal Stack Network Link'),
               _legendDot(const Color(0xFFA855F7), 'Cross-Host Mesh Link'),
               _legendDot(const Color(0xFF10B981), 'Running Container'),
               _legendDot(const Color(0xFF94A3B8), 'Stopped / No Active Task'),
-              _legendDot(const Color(0xFFF59E0B), 'Unmanaged Container'),
             ],
           ),
           const SizedBox(height: 12),
@@ -1457,7 +1663,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                                   ),
                                 ),
 
-                                // Layer 2: Centurion Host Enclosure Boxes
+                                // Layer 2: Centurion Host Enclosure Boxes (Column 3)
                                 for (final box in hostBoxes)
                                   Positioned.fromRect(
                                     rect: box.rect,
@@ -1465,30 +1671,62 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                                         box, theme, isDark),
                                   ),
 
-                                // Layer 3: Curved Topology Edges (drawn ABOVE host enclosures so NET & MESH links are clearly visible!)
+                                // Layer 3: Curved Topology Edges (drawn ABOVE host enclosures)
                                 Positioned.fill(
                                   child: IgnorePointer(
                                     child: CustomPaint(
                                       painter: _ClusterTopologyEdgesPainter(
                                         edges: edges,
                                         selectedId: _selectedNodeId,
+                                        highlightedNodeIds: highlightedNodeIds,
                                         isDark: isDark,
                                       ),
                                     ),
                                   ),
                                 ),
 
-                                // Layer 4: Column headers, Ingress Route Cards & Container Cards (crisp on top)
+                                // Layer 4: Column Headers, Ingress Cards, Stack Cards & Container Cards
+                                // Column 1 Header: Ingress
                                 Positioned(
                                   left: ingressColX,
                                   top: topMargin,
                                   width: ingressCardW,
                                   child: _buildColumnHeader(
                                     icon: Icons.alt_route,
-                                    title: 'LOAD BALANCING / INGRESS',
+                                    title: '1. INGRESS / CADDY',
                                     subtitle:
                                         '${ingressNodes.length} routes · ${widget.state.dnsRecords.length} DNS',
                                     color: const Color(0xFFF97316),
+                                    isDark: isDark,
+                                  ),
+                                ),
+
+                                // Column 2 Header: Stacks
+                                Positioned(
+                                  left: stackColX,
+                                  top: topMargin,
+                                  width: stackCardW,
+                                  child: _buildColumnHeader(
+                                    icon: Icons.layers_outlined,
+                                    title: '2. LEGIONS (STACKS)',
+                                    subtitle:
+                                        '${visibleStacks.length} deployed${_showUnmanaged && unmanagedGroupNames.isNotEmpty ? ' + ${unmanagedGroupNames.length} unmanaged' : ''}',
+                                    color: const Color(0xFF6366F1),
+                                    isDark: isDark,
+                                  ),
+                                ),
+
+                                // Column 3 Header: Centurion Hosts
+                                Positioned(
+                                  left: hostColX,
+                                  top: topMargin,
+                                  width: hostWidth,
+                                  child: _buildColumnHeader(
+                                    icon: Icons.dns_outlined,
+                                    title: '3. CENTURION HOSTS & CONTAINERS',
+                                    subtitle:
+                                        '${hostBoxes.length} nodes · $runningContainers/${containers.length} containers running',
+                                    color: const Color(0xFF38BDF8),
                                     isDark: isDark,
                                   ),
                                 ),
@@ -1514,7 +1752,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                                         ),
                                       ),
                                       child: Text(
-                                        'No active Ingress routes detected for the selected filter.',
+                                        'No active Ingress routes for the visible stacks.',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: theme.colorScheme.onSurface
@@ -1524,21 +1762,41 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                                     ),
                                   ),
 
-                                // Ingress Route Cards
+                                // Column 1: Ingress Route Cards
                                 for (final ing in ingressNodes)
                                   Positioned.fromRect(
                                     rect: ing.rect,
                                     child: _buildIngressCard(
-                                        ing, theme, isDark),
+                                      ing,
+                                      theme,
+                                      isDark,
+                                      highlightedNodeIds,
+                                    ),
                                   ),
 
-                                // Container Cards inside Hosts
+                                // Column 2: Stack Cards
+                                for (final st in stackNodes)
+                                  Positioned.fromRect(
+                                    rect: st.rect,
+                                    child: _buildStackCard(
+                                      st,
+                                      theme,
+                                      isDark,
+                                      highlightedNodeIds,
+                                    ),
+                                  ),
+
+                                // Column 3: Container Cards inside Hosts
                                 for (final box in hostBoxes)
                                   for (final c in box.containers)
                                     Positioned.fromRect(
                                       rect: c.rect,
                                       child: _buildContainerCard(
-                                          c, theme, isDark),
+                                        c,
+                                        theme,
+                                        isDark,
+                                        highlightedNodeIds,
+                                      ),
                                     ),
                               ],
                             ),
@@ -1550,7 +1808,9 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                 ),
 
                 // Right-side Inspector Panel when a node is selected
-                if (selectedContainer != null || selectedIngress != null) ...[
+                if (selectedContainer != null ||
+                    selectedStack != null ||
+                    selectedIngress != null) ...[
                   const SizedBox(width: 14),
                   SizedBox(
                     width: 300,
@@ -1558,9 +1818,11 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                       theme: theme,
                       isDark: isDark,
                       container: selectedContainer,
+                      stackNode: selectedStack,
                       ingress: selectedIngress,
                       edges: edges,
                       containerById: containerById,
+                      stackNodeById: stackNodeById,
                       ingressNodes: ingressNodes,
                     ),
                   ),
@@ -1626,6 +1888,7 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                     fontSize: 10.5,
                     color: isDark ? Colors.white70 : Colors.black54,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -1639,92 +1902,219 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     _TopoIngressNode ing,
     ThemeData theme,
     bool isDark,
+    Set<String> highlightedNodeIds,
   ) {
     final isSelected = _selectedNodeId == ing.id;
+    final isDimmed =
+        _selectedNodeId != null && !highlightedNodeIds.contains(ing.id);
     const accent = Color(0xFFF97316);
     final linkedCount = ing.targetContainerIds.length;
 
-    return GestureDetector(
-      onTap: () => setState(() {
-        _selectedNodeId = isSelected ? null : ing.id;
-      }),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111827) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? accent
-                : accent.withValues(alpha: isDark ? 0.45 : 0.35),
-            width: isSelected ? 2 : 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: isSelected ? 0.25 : 0.08),
-              blurRadius: isSelected ? 12 : 6,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 140),
+      opacity: isDimmed ? 0.32 : 1.0,
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _selectedNodeId = isSelected ? null : ing.id;
+        }),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF111827) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? accent
+                  : accent.withValues(alpha: isDark ? 0.45 : 0.35),
+              width: isSelected ? 2 : 1.2,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  ing.isTls ? Icons.lock : Icons.public,
-                  size: 14,
-                  color: ing.isTls ? const Color(0xFF10B981) : accent,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    ing.host,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: isSelected ? 0.28 : 0.08),
+                blurRadius: isSelected ? 12 : 6,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    ing.isTls ? Icons.lock : Icons.public,
+                    size: 14,
+                    color: ing.isTls ? const Color(0xFF10B981) : accent,
                   ),
-                ),
-                if (linkedCount > 1) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    margin: const EdgeInsets.only(right: 4),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                  const SizedBox(width: 6),
+                  Expanded(
                     child: Text(
-                      '${linkedCount}x',
+                      ing.host,
                       style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: accent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (linkedCount > 1) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${linkedCount}x',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                  InkWell(
+                    onTap: () => _openHostUrl(ing.host),
+                    child:
+                        const Icon(Icons.open_in_new, size: 13, color: accent),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '→ ${ing.upstream}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'Courier New',
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStackCard(
+    _TopoStackNode st,
+    ThemeData theme,
+    bool isDark,
+    Set<String> highlightedNodeIds,
+  ) {
+    final isSelected = _selectedNodeId == st.id;
+    final isDimmed =
+        _selectedNodeId != null && !highlightedNodeIds.contains(st.id);
+    final accent = st.accentColor;
+    final allRunning =
+        st.totalContainers > 0 && st.runningContainers == st.totalContainers;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 140),
+      opacity: isDimmed ? 0.32 : 1.0,
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _selectedNodeId = isSelected ? null : st.id;
+        }),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF111827) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? accent
+                  : accent.withValues(alpha: isDark ? 0.55 : 0.45),
+              width: isSelected ? 2.2 : 1.3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: isSelected ? 0.28 : 0.08),
+                blurRadius: isSelected ? 12 : 6,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      st.isUnmanaged ? Icons.inventory_2_outlined : Icons.layers,
+                      size: 13,
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      st.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
-                InkWell(
-                  onTap: () => _openHostUrl(ing.host),
-                  child: const Icon(Icons.open_in_new, size: 13, color: accent),
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            Text(
-              '→ ${ing.upstream}',
-              style: TextStyle(
-                fontSize: 11,
-                fontFamily: 'Courier New',
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+              Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: allRunning
+                          ? const Color(0xFF10B981)
+                          : (st.runningContainers > 0
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF94A3B8)),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${st.runningContainers}/${st.totalContainers} ctrs',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.78),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      st.hostNodeIds.isNotEmpty
+                          ? st.hostNodeIds.join(', ')
+                          : 'unassigned',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'Courier New',
+                        color: accent.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1756,7 +2146,6 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Host Header Bar
           Container(
             height: 54,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1862,167 +2251,170 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     _TopoContainerNode c,
     ThemeData theme,
     bool isDark,
+    Set<String> highlightedNodeIds,
   ) {
     final isSelected = _selectedNodeId == c.id;
+    final isDimmed =
+        _selectedNodeId != null && !highlightedNodeIds.contains(c.id);
     final statusColor = c.isUnmanaged
         ? const Color(0xFFF59E0B)
         : (c.isPlaceholder
             ? const Color(0xFF94A3B8)
             : (c.isRunning ? const Color(0xFF10B981) : Colors.redAccent));
 
-    return GestureDetector(
-      onTap: () => setState(() {
-        _selectedNodeId = isSelected ? null : c.id;
-      }),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: isDark
-              ? (c.isPlaceholder
-                  ? const Color(0xFF172033)
-                  : const Color(0xFF1E293B))
-              : (c.isPlaceholder
-                  ? const Color(0xFFF1F5F9)
-                  : const Color(0xFFF8FAFC)),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFF97316)
-                : statusColor.withValues(alpha: isDark ? 0.45 : 0.35),
-            width: isSelected ? 2 : 1.1,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 140),
+      opacity: isDimmed ? 0.3 : 1.0,
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _selectedNodeId = isSelected ? null : c.id;
+        }),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: isDark
+                ? (c.isPlaceholder
+                    ? const Color(0xFF172033)
+                    : const Color(0xFF1E293B))
+                : (c.isPlaceholder
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFFF8FAFC)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? c.stackColor
+                  : c.stackColor.withValues(alpha: isDark ? 0.5 : 0.4),
+              width: isSelected ? 2.2 : 1.2,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: c.stackColor.withValues(alpha: 0.28),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : null,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFF97316).withValues(alpha: 0.25),
-                    blurRadius: 10,
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    c.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  flex: 0,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 112),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: (c.isUnmanaged
-                                ? const Color(0xFFF59E0B)
-                                : const Color(0xFF6366F1))
-                            .withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        c.stackName,
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: c.isUnmanaged
-                              ? const Color(0xFFF59E0B)
-                              : const Color(0xFF818CF8),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-              ],
-            ),
-            Text(
-              c.image,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontFamily: 'Courier New',
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-            Row(
-              children: [
-                if (c.isPlaceholder) ...[
-                  const Icon(Icons.pause_circle_outline,
-                      size: 11, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 3),
-                  const Text(
-                    'STOPPED',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF94A3B8),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ] else if (c.ip.isNotEmpty) ...[
-                  Icon(Icons.lan_outlined,
-                      size: 11,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.55)),
-                  const SizedBox(width: 3),
-                  Text(
-                    c.ip,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontFamily: 'Courier New',
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (c.ports.isNotEmpty)
+                  const SizedBox(width: 7),
                   Expanded(
                     child: Text(
-                      c.ports.join(', '),
+                      c.name,
                       style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF38BDF8),
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                else
-                  const Spacer(),
-                if (c.cpuPercent > 0)
-                  Text(
-                    '${c.cpuPercent.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    flex: 0,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 112),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: c.stackColor.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          c.stackName,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: c.stackColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
                   ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              Text(
+                c.image,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontFamily: 'Courier New',
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Row(
+                children: [
+                  if (c.isPlaceholder) ...[
+                    const Icon(Icons.pause_circle_outline,
+                        size: 11, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'STOPPED',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ] else if (c.ip.isNotEmpty) ...[
+                    Icon(Icons.lan_outlined,
+                        size: 11,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.55)),
+                    const SizedBox(width: 3),
+                    Text(
+                      c.ip,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'Courier New',
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  if (c.ports.isNotEmpty)
+                    Expanded(
+                      child: Text(
+                        c.ports.join(', '),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF38BDF8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  else
+                    const Spacer(),
+                  if (c.cpuPercent > 0)
+                    Text(
+                      '${c.cpuPercent.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2032,15 +2424,25 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
     required ThemeData theme,
     required bool isDark,
     _TopoContainerNode? container,
+    _TopoStackNode? stackNode,
     _TopoIngressNode? ingress,
     required List<_TopoEdge> edges,
     required Map<String, _TopoContainerNode> containerById,
+    required Map<String, _TopoStackNode> stackNodeById,
     required List<_TopoIngressNode> ingressNodes,
   }) {
+    final selectedId = container?.id ?? stackNode?.id ?? ingress?.id;
     final relatedEdges = edges.where((e) {
-      final id = container?.id ?? ingress?.id;
-      return e.fromId == id || e.toId == id;
+      return e.fromId == selectedId || e.toId == selectedId;
     }).toList();
+
+    String resolveLabel(String id) {
+      if (containerById.containsKey(id)) return containerById[id]!.name;
+      if (stackNodeById.containsKey(id)) return stackNodeById[id]!.name;
+      final ing = ingressNodes.where((i) => i.id == id).firstOrNull;
+      if (ing != null) return ing.host;
+      return id;
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2059,14 +2461,20 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
           Row(
             children: [
               Icon(
-                container != null ? Icons.view_in_ar : Icons.alt_route,
-                color: const Color(0xFFF97316),
+                container != null
+                    ? Icons.view_in_ar
+                    : (stackNode != null ? Icons.layers : Icons.alt_route),
+                color: stackNode?.accentColor ?? const Color(0xFFF97316),
                 size: 20,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  container != null ? 'Container Inspector' : 'Ingress Inspector',
+                  container != null
+                      ? 'Container Inspector'
+                      : (stackNode != null
+                          ? 'Stack Inspector'
+                          : 'Ingress Inspector'),
                   style: theme.textTheme.titleSmall
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
@@ -2118,6 +2526,28 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                 label: const Text('Open Stack Containers'),
               ),
             ],
+          ] else if (stackNode != null) ...[
+            _inspectorRow('Stack Name', stackNode.name),
+            _inspectorRow('Services', '${stackNode.totalServices}'),
+            _inspectorRow(
+              'Containers',
+              '${stackNode.runningContainers} running / ${stackNode.totalContainers} total',
+            ),
+            _inspectorRow(
+              'Deployed On Hosts',
+              stackNode.hostNodeIds.isNotEmpty
+                  ? stackNode.hostNodeIds.join(', ')
+                  : 'Unassigned',
+            ),
+            if (!stackNode.isUnmanaged &&
+                widget.onViewStackContainers != null) ...[
+              const SizedBox(height: 10),
+              FilledButton.tonalIcon(
+                onPressed: () => widget.onViewStackContainers!(stackNode.name),
+                icon: const Icon(Icons.layers_outlined, size: 16),
+                label: const Text('Open Stack Containers'),
+              ),
+            ],
           ] else if (ingress != null) ...[
             _inspectorRow('Domain / Host', ingress.host),
             _inspectorRow('Protocol', ingress.isTls ? 'HTTPS (TLS)' : 'HTTP'),
@@ -2157,14 +2587,8 @@ class _ClusterTopologyDashboardState extends State<_ClusterTopologyDashboard> {
                     separatorBuilder: (_, _) => const SizedBox(height: 6),
                     itemBuilder: (_, idx) {
                       final e = relatedEdges[idx];
-                      final fromLabel = containerById[e.fromId]?.name ??
-                          ingressNodes
-                              .where((i) => i.id == e.fromId)
-                              .map((i) => i.host)
-                              .firstOrNull ??
-                          e.fromId;
-                      final toLabel =
-                          containerById[e.toId]?.name ?? e.toId;
+                      final fromLabel = resolveLabel(e.fromId);
+                      final toLabel = resolveLabel(e.toId);
                       return Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -2238,15 +2662,17 @@ class _TopologyGridPainter extends CustomPainter {
 }
 
 /// CustomPainter for Layer 3: curved Bézier topology connections drawn ABOVE host enclosures
-/// with true tangent-aligned arrowheads.
+/// with true tangent-aligned arrowheads and transitive selection highlighting.
 class _ClusterTopologyEdgesPainter extends CustomPainter {
   final List<_TopoEdge> edges;
   final String? selectedId;
+  final Set<String> highlightedNodeIds;
   final bool isDark;
 
   _ClusterTopologyEdgesPainter({
     required this.edges,
     required this.selectedId,
+    required this.highlightedNodeIds,
     required this.isDark,
   });
 
@@ -2254,10 +2680,10 @@ class _ClusterTopologyEdgesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     for (final edge in edges) {
       final isHighlighted = selectedId == null ||
-          edge.fromId == selectedId ||
-          edge.toId == selectedId;
-      final alpha = isHighlighted ? 0.9 : 0.16;
-      final strokeWidth = (selectedId != null && isHighlighted) ? 2.6 : 1.9;
+          (highlightedNodeIds.contains(edge.fromId) &&
+              highlightedNodeIds.contains(edge.toId));
+      final alpha = isHighlighted ? 0.88 : 0.12;
+      final strokeWidth = (selectedId != null && isHighlighted) ? 2.6 : 1.8;
 
       final paint = Paint()
         ..color = edge.color.withValues(alpha: alpha)
@@ -2330,6 +2756,7 @@ class _ClusterTopologyEdgesPainter extends CustomPainter {
   bool shouldRepaint(covariant _ClusterTopologyEdgesPainter oldDelegate) {
     return oldDelegate.edges != edges ||
         oldDelegate.selectedId != selectedId ||
+        oldDelegate.highlightedNodeIds != highlightedNodeIds ||
         oldDelegate.isDark != isDark;
   }
 }
