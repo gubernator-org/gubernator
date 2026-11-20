@@ -292,20 +292,6 @@ func ApplyClusterUpdate(targetVersion string) error {
 
 	setUpdateStatus("downloading", targetVersion, fmt.Sprintf("Connecting to GitHub to download %s...", targetVersion), "")
 
-	if targetVersion != "" {
-		for _, path := range []string{"/data/VERSION", "/app/VERSION", "VERSION", "../VERSION"} {
-			_ = os.WriteFile(path, []byte(targetVersion), 0644)
-		}
-	}
-
-	if db.DB != nil {
-		var config db.ClusterConfig
-		if err := db.DB.First(&config, "id = ?", "global").Error; err == nil {
-			config.TargetVersion = targetVersion
-			db.DB.Save(&config)
-		}
-	}
-
 	// Trigger asynchronous cluster upgrade so HTTP response returns cleanly first
 	go func() {
 		defer func() {
@@ -325,9 +311,14 @@ func ApplyClusterUpdate(targetVersion string) error {
 		slog.Info("downloading release binary with retry", "url", binURL)
 		tmpPath := fmt.Sprintf("/tmp/gbnt-update-%d", time.Now().Unix())
 
-		// Try downloading with retry (up to 15 attempts x 3s = 45s backoff for GitHub Actions release publication)
+		// Try downloading with retry (up to 15 attempts with 5m per-download timeout for ~100MB binaries)
 		var dlErr error
-		client := &http.Client{Timeout: 30 * time.Second}
+		client := &http.Client{
+			Timeout: 5 * time.Minute,
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 20 * time.Second,
+			},
+		}
 		for attempt := 1; attempt <= 15; attempt++ {
 			setUpdateStatus("downloading", targetVersion, fmt.Sprintf("Downloading binary from GitHub (attempt %d/15)...", attempt), "")
 			resp, err := client.Get(binURL)
@@ -379,6 +370,20 @@ func ApplyClusterUpdate(targetVersion string) error {
 			_ = os.Chmod(dst, 0755)
 		}
 		_ = os.Remove(tmpPath)
+
+		// Persist targetVersion ONLY after the new binary has been downloaded and installed
+		if targetVersion != "" {
+			for _, path := range []string{"/data/VERSION", "/app/VERSION", "VERSION", "../VERSION"} {
+				_ = os.WriteFile(path, []byte(targetVersion), 0644)
+			}
+		}
+		if db.DB != nil {
+			var config db.ClusterConfig
+			if err := db.DB.First(&config, "id = ?", "global").Error; err == nil {
+				config.TargetVersion = targetVersion
+				db.DB.Save(&config)
+			}
+		}
 
 		// 2. Upgrade worker Centurion nodes via remote SSH
 		if db.DB != nil {

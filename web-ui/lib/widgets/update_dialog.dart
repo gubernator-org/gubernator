@@ -136,17 +136,25 @@ class _UpdateDialogState extends State<UpdateDialog> {
           }
         }
 
-        // Failsafe timeout after 90 seconds
-        if (_pollCount > 60) {
+        // Failsafe timeout after 5 minutes (200 polls x 1.5s)
+        if (_pollCount > 200) {
           _pollTimer?.cancel();
           if (mounted) {
-            setState(() {
-              _statusPhase = 'success';
-              _statusMsg = 'Update applied. Reloading dashboard...';
-            });
-            Future.delayed(const Duration(milliseconds: 1500), () {
-              html.window.location.reload();
-            });
+            if (_statusPhase == 'restarting') {
+              setState(() {
+                _statusPhase = 'success';
+                _statusMsg = 'Update applied. Reloading dashboard...';
+              });
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                html.window.location.reload();
+              });
+            } else {
+              setState(() {
+                _statusPhase = 'failed';
+                _error =
+                    'Update timed out while in phase "$_statusPhase". Check manager logs or update via CLI.';
+              });
+            }
           }
         }
       });

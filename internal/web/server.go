@@ -60,6 +60,10 @@ var Version = "v2.78.0"
 
 // GetVersion returns the compiled or dynamic version
 func GetVersion() string {
+	// Prefer compiled-in ldflags version so the dashboard always reflects the running binary
+	if Version != "" && Version != "dev" {
+		return Version
+	}
 	for _, path := range []string{"VERSION", "/data/VERSION", "/app/VERSION", "../VERSION"} {
 		if data, err := os.ReadFile(path); err == nil {
 			v := strings.TrimSpace(string(data))
@@ -67,9 +71,6 @@ func GetVersion() string {
 				return v
 			}
 		}
-	}
-	if Version != "" && Version != "dev" {
-		return Version
 	}
 	return "v2.59.0"
 }
