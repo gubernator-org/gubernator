@@ -49,11 +49,52 @@ Gubernator operates using a single, portable binary (`gbnt`) that can run as eit
 
 ---
 
-## 📸 Enterprise Active Directory & RBAC (`v2.20.0`)
+## 📸 Visual Tour — How Gubernator Works
 
-| Modern Login Screen & Domain Selector | Security & Active Directory Management |
+Explore Gubernator's embedded **Flutter Web Dashboard** (Material Design 3, Light & Dark themes) running on a live multi-node cluster (`Manager` + `Worker` Centurions):
+
+### 🗺️ 3-Tier Cluster Stack & Ingress Topology
+Visualize live traffic end-to-end across **1. Ingress / Caddy Routes** ➔ **2. Legions (Stacks)** ➔ **3. Centurion Hosts & Containers**, with cross-host placement, internal `NET`/`MESH` links, and interactive node inspection:
+
+![Cluster Stack & Ingress Topology](docs/images/v4.1.5/cluster-topology.png)
+
+### 🏛️ Cluster Management, Stacks & Compose Studio
+
+| Cluster Overview & SRE Profile | Legions (Stacks) & Live Containers |
+| :---: | :---: |
+| ![Cluster Overview](docs/images/v3.2.6/02-overview.png) | ![Legions Stacks](docs/images/v4.1.5/legions-stacks.png) |
+| *Real-time cluster KPIs, host storage, active SRE profile, and node telemetry.* | *Deploy, scale, inspect, and manage Docker Compose stacks with clickable port links.* |
+
+| Registered Centurions (Nodes & Scheduling) | Compose Studio IDE & Gubernator Copilot |
+| :---: | :---: |
+| ![Registered Centurions](docs/images/v4.1.5/centurions-nodes.png) | ![Compose Studio](docs/images/v3.2.6/14-compose-studio.png) |
+| *Hardware labels, scheduling toggles, CPU/RAM/Disk bars, shell, and maintenance actions.* | *YAML editor with smart suggestions and visual Copilot for Caddy, WAF, SLOs & placement.* |
+
+### 🌐 Ingress, DNS & Deep Observability
+
+| Load Balancing & Managed TLS Certificates (Caddy) | CoreDNS Auto-Discovery & DNS Playground |
+| :---: | :---: |
+| ![Caddy Managed TLS Certificates](docs/images/v4.1.5/caddy-tls-certs.png) | ![CoreDNS Management Suite](docs/images/v3.2.6/10-coredns.png) |
+| *Multi-node Caddy cluster proxy, internal Root CA, custom cert upload, and renewal.* | *Automatic `*.gbnt.local` service discovery with built-in `Curl`, `Ping`, and `Dig` tests.* |
+
+| Loki Logs Explorer | eBPF Live Hub & Kernel Observability |
+| :---: | :---: |
+| ![Loki Logs Explorer](docs/images/v3.2.6/11-loki-logs.png) | ![eBPF Live Hub](docs/images/v3.2.6/12-ebpf-live-hub.png) |
+| *Cluster-wide container log aggregation, level filters, live tailing, and `.log` export.* | *Non-invasive L4/L7 socket and packet tracing with service mesh correlation.* |
+
+<details>
+<summary><b>🔍 More Screenshots: Storage & Backups, Security, RBAC & Enterprise Active Directory</b></summary>
+
+| Storage & Backups ("The Granaries") | Security, MFA, SIEM & Compliance Suite |
+| :---: | :---: |
+| ![Storage & Backups](docs/images/v3.2.6/06-storage-backups.png) | ![Security & Compliance](docs/images/v3.2.6/13-security-compliance.png) |
+| *Cluster-wide Docker volumes, GlusterFS, network mounts, file explorer, and snapshots.* | *Local users, TOTP MFA, RBAC roles, forensic audit, and CIS/NIS2/ENS compliance.* |
+
+| Modern Login Screen & Domain Selector | Active Directory / OpenLDAP Management |
 | :---: | :---: |
 | ![Login Screen](docs/images/login_screen.png) | ![Security & AD](docs/images/security_ad.png) |
+
+</details>
 
 ---
 
