@@ -17,7 +17,53 @@ import (
 var (
 	jwtSecretOnce sync.Once
 	jwtSecretKey  []byte
+
+	// OWASP ASVS V3.5: In-memory JWT revocation list (token hash / JTI -> expiry)
+	revokedMu     sync.RWMutex
+	revokedTokens = make(map[string]time.Time)
 )
+
+// RevokeToken invalidates a JWT immediately on logout or credential change (OWASP ASVS V3.5).
+func RevokeToken(tokenStr string) {
+	tokenStr = strings.TrimSpace(tokenStr)
+	if tokenStr == "" {
+		return
+	}
+	exp := time.Now().Add(24 * time.Hour)
+	if token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, &Claims{}); err == nil {
+		if claims, ok := token.Claims.(*Claims); ok && claims.ExpiresAt != nil {
+			exp = claims.ExpiresAt.Time
+		}
+	}
+	revokedMu.Lock()
+	revokedTokens[tokenStr] = exp
+	// Opportunistic prune of already-expired entries
+	now := time.Now()
+	for k, v := range revokedTokens {
+		if v.Before(now) {
+			delete(revokedTokens, k)
+		}
+	}
+	revokedMu.Unlock()
+}
+
+// IsTokenRevoked reports whether a token string has been explicitly revoked.
+func IsTokenRevoked(tokenStr string) bool {
+	revokedMu.RLock()
+	exp, found := revokedTokens[strings.TrimSpace(tokenStr)]
+	revokedMu.RUnlock()
+	if !found {
+		return false
+	}
+	return time.Now().Before(exp)
+}
+
+// RevokedTokenCount returns the number of currently tracked revoked sessions.
+func RevokedTokenCount() int {
+	revokedMu.RLock()
+	defer revokedMu.RUnlock()
+	return len(revokedTokens)
+}
 
 // UserSession represents the authenticated identity in memory and in the UI.
 type UserSession struct {
@@ -86,9 +132,11 @@ func getJWTSecret() []byte {
 	return jwtSecretKey
 }
 
-// GenerateToken generates a signed JWT token valid for 24 hours.
+// GenerateToken generates a signed JWT token valid for 24 hours with a unique JTI (OWASP ASVS V3.5).
 func GenerateToken(user UserSession) (string, error) {
 	exp := time.Now().Add(24 * time.Hour)
+	jtiBytes := make([]byte, 12)
+	_, _ = rand.Read(jtiBytes)
 	claims := Claims{
 		Username:    user.Username,
 		DisplayName: user.DisplayName,
@@ -96,6 +144,7 @@ func GenerateToken(user UserSession) (string, error) {
 		Role:        string(user.Role),
 		Provider:    user.Provider,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        hex.EncodeToString(jtiBytes),
 			ExpiresAt: jwt.NewNumericDate(exp),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "gubernator",
@@ -109,6 +158,10 @@ func GenerateToken(user UserSession) (string, error) {
 
 // ValidateToken parses and validates a JWT token string, returning the UserSession.
 func ValidateToken(tokenStr string) (*UserSession, error) {
+	if IsTokenRevoked(tokenStr) {
+		return nil, errors.New("session token has been revoked")
+	}
+
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])

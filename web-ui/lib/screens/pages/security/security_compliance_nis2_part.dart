@@ -85,6 +85,18 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                   }
                 },
               ),
+              _buildStandardPill(
+                isDark: isDark,
+                primaryColor: const Color(0xFF06B6D4),
+                title: "🛡️ OWASP Suite (Top 10 / ASVS / DAST)",
+                isSelected: _selectedComplianceStandard == "OWASP",
+                onTap: () {
+                  _updateState(() => _selectedComplianceStandard = "OWASP");
+                  if (_owaspSummary == null) {
+                    _loadOWASPStatus();
+                  }
+                },
+              ),
             ],
           ),
         ),
@@ -100,7 +112,9 @@ extension _SecurityComplianceNis2Ext on _SecurityPageState {
                       ? _buildENSDashboardTab(isDark, primaryColor)
                       : (_selectedComplianceStandard == "ISO27001"
                           ? _buildISO27001DashboardTab(isDark, primaryColor)
-                          : _buildDORADashboardTab(isDark, primaryColor)))),
+                          : (_selectedComplianceStandard == "OWASP"
+                              ? _buildOWASPDashboardTab(isDark, primaryColor)
+                              : _buildDORADashboardTab(isDark, primaryColor))))),
         ),
       ],
     );

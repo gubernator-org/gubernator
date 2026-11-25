@@ -48,15 +48,15 @@ type beaconHistory struct {
 // SecurityIDS performs real-time runtime threat detection, Zero-Trust baseline tracking,
 // and automatic SIEM / Audit chain recording on all eBPF network & process telemetry.
 type SecurityIDS struct {
-	mu              sync.RWMutex
-	alerts          []SecurityAlert
-	maxAlerts       int
-	dedupCache      map[string]time.Time
-	scanTracker     map[string]*portScanWindow // srcIP/srcName -> recent dest ports
-	beaconTracker   map[string]*beaconHistory  // src->dst:port -> timestamps
-	baselineLocked  bool
-	baselineLockAt  *time.Time
-	baselineRules   map[string]*ZeroTrustRule
+	mu             sync.RWMutex
+	alerts         []SecurityAlert
+	maxAlerts      int
+	dedupCache     map[string]time.Time
+	scanTracker    map[string]*portScanWindow // srcIP/srcName -> recent dest ports
+	beaconTracker  map[string]*beaconHistory  // src->dst:port -> timestamps
+	baselineLocked bool
+	baselineLockAt *time.Time
+	baselineRules  map[string]*ZeroTrustRule
 }
 
 // NewSecurityIDS creates a new runtime IDS and Zero-Trust engine.
@@ -216,10 +216,10 @@ func (s *SecurityIDS) AnalyzeFlow(f *Flow) []SecurityAlert {
 				Simulated:      f.Synthetic,
 				DetectionMs:    elapsedMs(start),
 				Evidence: map[string]string{
-					"service":    svcLabel,
-					"dest_port":  fmt.Sprintf("%d", f.DestPort),
-					"dest_node":  f.DestName,
-					"protocol":   f.Protocol,
+					"service":   svcLabel,
+					"dest_port": fmt.Sprintf("%d", f.DestPort),
+					"dest_node": f.DestName,
+					"protocol":  f.Protocol,
 				},
 			}, fmt.Sprintf("lat:%s:%s:%d", f.SourceName, f.DestName, f.DestPort), 15*time.Second); a != nil {
 				triggered = append(triggered, *a)

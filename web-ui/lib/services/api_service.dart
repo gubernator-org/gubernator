@@ -1017,6 +1017,14 @@ class ApiService {
   /// Fetches the unified Continuous Compliance Overview across all 5 regulatory frameworks.
   static Future<ComplianceOverviewModel?> fetchComplianceOverview() => ImageComplianceApi.fetchComplianceOverview();
 
-  /// Triggers an immediate, cluster-wide re-evaluation across all 4 regulatory frameworks.
+  /// Triggers an immediate, cluster-wide re-evaluation across all 6 regulatory frameworks.
   static Future<ComplianceOverviewModel?> evaluateAllCompliance() => ImageComplianceApi.evaluateAllCompliance();
+
+  static Future<OWASPSummaryModel?> fetchOWASPStatus() => ImageComplianceApi.fetchOWASPStatus();
+  static Future<String?> fetchOWASPReport({String format = 'markdown'}) => ImageComplianceApi.fetchOWASPReport(format: format);
+  static Future<List<OWASPDASTResultModel>> fetchOWASPDASTHistory() => ImageComplianceApi.fetchOWASPDASTHistory();
+  static Future<OWASPDASTResultModel> runOWASPDASTScan({required String targetUrl, bool probeWaf = true, bool includeZap = false}) =>
+      ImageComplianceApi.runOWASPDASTScan(targetUrl: targetUrl, probeWaf: probeWaf, includeZap: includeZap);
+  static Future<OWASPComposeLintResultModel> lintComposeOWASP(String composeYaml) =>
+      ImageComplianceApi.lintComposeOWASP(composeYaml);
 }

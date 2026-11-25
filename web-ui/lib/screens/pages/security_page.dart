@@ -12,6 +12,7 @@ part 'security/security_compliance_nis2_part.dart';
 part 'security/security_ens_part.dart';
 part 'security/security_cis_docker_part.dart';
 part 'security/security_iso_dora_part.dart';
+part 'security/security_owasp_part.dart';
 
 class SecurityPage extends StatefulWidget {
   final DashboardState state;
@@ -107,6 +108,22 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
   String _doraPillarFilter = "ALL";
   String _doraStatusFilter = "ALL";
 
+  // OWASP Security Suite State (Top 10 Web, API, ASVS L2, Docker, LLM, DAST & Compose Auditor)
+  OWASPSummaryModel? _owaspSummary;
+  bool _owaspLoading = true;
+  String _owaspSubView = 'compliance'; // 'compliance', 'dast', 'compose'
+  String _owaspDomainFilter = 'ALL';
+  String _owaspStatusFilter = 'ALL';
+  List<OWASPDASTResultModel> _owaspDastHistory = [];
+  OWASPDASTResultModel? _owaspLatestDast;
+  bool _owaspDastRunning = false;
+  bool _owaspDastProbeWaf = true;
+  bool _owaspDastIncludeZap = false;
+  final TextEditingController _owaspDastUrlCtrl = TextEditingController(text: 'http://127.0.0.1:4001');
+  final TextEditingController _owaspComposeCtrl = TextEditingController();
+  OWASPComposeLintResultModel? _owaspComposeResult;
+  bool _owaspComposeLinting = false;
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +145,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
           if (_ensSummary == null && !_ensLoading) _loadENSStatus();
           if (_isoSummary == null && !_isoLoading) _loadISO27001Status();
           if (_doraSummary == null && !_doraLoading) _loadDORAStatus();
+          if (_owaspSummary == null && !_owaspLoading) _loadOWASPStatus();
         }
       }
     });
@@ -147,6 +165,8 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _owaspDastUrlCtrl.dispose();
+    _owaspComposeCtrl.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -164,6 +184,86 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
     _loadENSStatus();
     _loadISO27001Status();
     _loadDORAStatus();
+    _loadOWASPStatus();
+  }
+
+  Future<void> _loadOWASPStatus() async {
+    setState(() => _owaspLoading = true);
+    try {
+      final summary = await ApiService.fetchOWASPStatus();
+      if (mounted) {
+        setState(() {
+          _owaspSummary = summary;
+          _owaspLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _owaspLoading = false);
+    }
+  }
+
+  Future<void> _loadOWASPDASTHistory() async {
+    final hist = await ApiService.fetchOWASPDASTHistory();
+    if (mounted) setState(() => _owaspDastHistory = hist);
+  }
+
+  Future<void> _runOWASPDAST() async {
+    final target = _owaspDastUrlCtrl.text.trim();
+    if (target.isEmpty) return;
+    setState(() => _owaspDastRunning = true);
+    try {
+      final res = await ApiService.runOWASPDASTScan(
+        targetUrl: target,
+        probeWaf: _owaspDastProbeWaf,
+        includeZap: _owaspDastIncludeZap,
+      );
+      if (mounted) {
+        setState(() {
+          _owaspLatestDast = res;
+          _owaspDastRunning = false;
+        });
+        _loadOWASPDASTHistory();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _owaspDastRunning = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('DAST Error: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _runOWASPComposeLint() async {
+    final yaml = _owaspComposeCtrl.text.trim();
+    if (yaml.isEmpty) return;
+    setState(() => _owaspComposeLinting = true);
+    try {
+      final res = await ApiService.lintComposeOWASP(yaml);
+      if (mounted) {
+        setState(() {
+          _owaspComposeResult = res;
+          _owaspComposeLinting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _owaspComposeLinting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lint Error: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _downloadOWASPReport(String format) async {
+    final content = await ApiService.fetchOWASPReport(format: format);
+    if (content == null || !mounted) return;
+    final ext = format == 'json' ? 'json' : 'md';
+    final mime = format == 'json' ? 'application/json' : 'text/markdown';
+    final blob = html.Blob([content], mime);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final a = html.AnchorElement(href: url)
+      ..setAttribute('download', 'owasp-compliance-report.$ext')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+    a.remove();
   }
 
   Future<void> _loadComplianceOverview() async {
@@ -198,6 +298,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
         _loadENSStatus(),
         _loadISO27001Status(),
         _loadDORAStatus(),
+        _loadOWASPStatus(),
       ]);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

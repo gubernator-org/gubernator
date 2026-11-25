@@ -546,7 +546,7 @@ class ImageComplianceApi {
     }
   }
 
-  /// Triggers an immediate, cluster-wide re-evaluation across all 4 regulatory frameworks.
+  /// Triggers an immediate, cluster-wide re-evaluation across all 6 regulatory frameworks.
   static Future<ComplianceOverviewModel?> evaluateAllCompliance() async {
     try {
       final response = await http.post(
@@ -560,5 +560,82 @@ class ImageComplianceApi {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Fetches OWASP Security Suite compliance evaluation (Top 10 Web, API, ASVS L2, Docker & LLM).
+  static Future<OWASPSummaryModel?> fetchOWASPStatus() async {
+    try {
+      final response = await http.get(Uri.parse('/api/security/owasp/status'), headers: authHeaders);
+      if (response.statusCode == 200) {
+        return OWASPSummaryModel.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Downloads the OWASP Security Suite compliance report in Markdown or JSON.
+  static Future<String?> fetchOWASPReport({String format = 'markdown'}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('/api/security/owasp/report?format=$format'),
+        headers: authHeaders,
+      );
+      if (response.statusCode == 200) return response.body;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches recent OWASP WSTG active DAST scan reports.
+  static Future<List<OWASPDASTResultModel>> fetchOWASPDASTHistory() async {
+    try {
+      final response = await http.get(Uri.parse('/api/security/owasp/dast/history'), headers: authHeaders);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.map((e) => OWASPDASTResultModel.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Executes a controlled OWASP WSTG active DAST scan (with optional WAF probes & ZAP Baseline).
+  static Future<OWASPDASTResultModel> runOWASPDASTScan({
+    required String targetUrl,
+    bool probeWaf = true,
+    bool includeZap = false,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/security/owasp/dast/scan'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'target_url': targetUrl,
+        'probe_waf': probeWaf,
+        'include_zap': includeZap,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return OWASPDASTResultModel.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('OWASP DAST scan failed: ${response.body}');
+  }
+
+  /// Statically audits a docker-compose.yml against OWASP Docker Security Top 10 (D01-D10).
+  static Future<OWASPComposeLintResultModel> lintComposeOWASP(String composeYaml) async {
+    final response = await http.post(
+      Uri.parse('/api/security/owasp/compose-lint'),
+      headers: authHeaders,
+      body: jsonEncode({'compose_yaml': composeYaml}),
+    );
+    if (response.statusCode == 200) {
+      return OWASPComposeLintResultModel.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('OWASP Compose lint failed: ${response.body}');
   }
 }

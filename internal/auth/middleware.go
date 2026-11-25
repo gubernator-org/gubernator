@@ -4,7 +4,10 @@ import (
 	"encoding/base64"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -150,6 +153,101 @@ func RequireRole(roles ...Role) gin.HandlerFunc {
 			"required":  roles,
 		})
 	}
+}
+
+// OWASPSecureHeadersMiddleware injects OWASP ASVS / Secure Headers Project HTTP headers.
+func OWASPSecureHeadersMiddleware(isWebUI bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+		c.Header("X-XSS-Protection", "0")
+		if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		if !isWebUI {
+			c.Header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		}
+		c.Next()
+	}
+}
+
+// MaxBodySizeMiddleware caps request body size to mitigate OWASP API4:2023 DoS attacks.
+func MaxBodySizeMiddleware(maxBytes int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Body != nil && maxBytes > 0 {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+		}
+		c.Next()
+	}
+}
+
+type authBucket struct {
+	attempts    int
+	windowStart time.Time
+	blockedTil  time.Time
+}
+
+var (
+	rateMu      sync.Mutex
+	authBuckets = make(map[string]*authBucket)
+)
+
+// AuthRateLimitMiddleware applies OWASP ASVS V2.2 / API4 progressive rate limiting on login & MFA endpoints.
+func AuthRateLimitMiddleware(maxAttempts int, window time.Duration) gin.HandlerFunc {
+	if maxAttempts <= 0 {
+		maxAttempts = 15
+	}
+	if window <= 0 {
+		window = 5 * time.Minute
+	}
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		if ip == "" {
+			ip = "unknown"
+		}
+		now := time.Now()
+		rateMu.Lock()
+		b, ok := authBuckets[ip]
+		if !ok || now.Sub(b.windowStart) > window {
+			b = &authBucket{windowStart: now}
+			authBuckets[ip] = b
+		}
+		if now.Before(b.blockedTil) {
+			retryAfter := int(time.Until(b.blockedTil).Seconds()) + 1
+			rateMu.Unlock()
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"error":       "OWASP Rate Limit: too many authentication attempts. Please retry later.",
+				"retry_after": retryAfter,
+			})
+			return
+		}
+		b.attempts++
+		if b.attempts > maxAttempts {
+			b.blockedTil = now.Add(window)
+			rateMu.Unlock()
+			c.Header("Retry-After", strconv.Itoa(int(window.Seconds())))
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"error":       "OWASP Rate Limit: temporary lockout active due to excessive authentication attempts.",
+				"retry_after": int(window.Seconds()),
+			})
+			return
+		}
+		rateMu.Unlock()
+		c.Next()
+	}
+}
+
+// ResetAuthRateLimit clears rate limit counters for an IP after a successful authentication.
+func ResetAuthRateLimit(ip string) {
+	if ip == "" {
+		return
+	}
+	rateMu.Lock()
+	delete(authBuckets, ip)
+	rateMu.Unlock()
 }
 
 // noinspection GoUnusedExportedFunction

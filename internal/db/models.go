@@ -521,15 +521,22 @@ type ImageSBOM struct {
 
 // ManagedWAFConfig stores global Web Application Firewall settings, rule toggles, and IP lists.
 type ManagedWAFConfig struct {
-	ID                     string    `gorm:"primaryKey;type:varchar(50)" json:"id"`          // "default"
-	Enabled                bool      `gorm:"default:false" json:"enabled"`                   // Master Switch
-	Mode                   string    `gorm:"type:varchar(20);default:'enforce'" json:"mode"` // "enforce" or "detection"
-	ParanoiaLevel          int       `gorm:"default:1" json:"paranoia_level"`                // 1 to 4
-	BlockSQLi              bool      `gorm:"default:true" json:"block_sqli"`                 // SQL Injection
-	BlockXSS               bool      `gorm:"default:true" json:"block_xss"`                  // Cross-Site Scripting
-	BlockRCE               bool      `gorm:"default:true" json:"block_rce"`                  // Remote Code Execution & Log4j
-	BlockLFI               bool      `gorm:"default:true" json:"block_lfi"`                  // Path Traversal / LFI
-	BlockScanners          bool      `gorm:"default:true" json:"block_scanners"`             // Malicious Scanners & Bots
+	ID                     string    `gorm:"primaryKey;type:varchar(50)" json:"id"`               // "default"
+	Enabled                bool      `gorm:"default:false" json:"enabled"`                        // Master Switch
+	Mode                   string    `gorm:"type:varchar(20);default:'enforce'" json:"mode"`      // "enforce" or "detection"
+	ParanoiaLevel          int       `gorm:"default:1" json:"paranoia_level"`                     // 1 to 4
+	BlockSQLi              bool      `gorm:"default:true" json:"block_sqli"`                      // SQL Injection
+	BlockXSS               bool      `gorm:"default:true" json:"block_xss"`                       // Cross-Site Scripting
+	BlockRCE               bool      `gorm:"default:true" json:"block_rce"`                       // Remote Code Execution & Log4j
+	BlockLFI               bool      `gorm:"default:true" json:"block_lfi"`                       // Path Traversal / LFI
+	BlockScanners          bool      `gorm:"default:true" json:"block_scanners"`                  // Malicious Scanners & Bots
+	BlockSSRF              bool      `gorm:"default:true" json:"block_ssrf"`                      // OWASP A10 / CRS-934 SSRF & Cloud Metadata
+	BlockXXE               bool      `gorm:"default:true" json:"block_xxe"`                       // OWASP A03 / CRS-933/944 XXE, SSTI & Prototype Pollution
+	BlockNoSQLi            bool      `gorm:"default:true" json:"block_nosqli"`                    // OWASP A03 NoSQL Injection ($ne/$where/$gt)
+	EnforceHTTPMethods     bool      `gorm:"default:true" json:"enforce_http_methods"`            // OWASP CRS-911 Block TRACE/TRACK/CONNECT
+	InjectSecureHeaders    bool      `gorm:"default:true" json:"inject_secure_headers"`           // OWASP Secure Headers (HSTS, CSP, nosniff, X-Frame, Referrer)
+	CSPMode                string    `gorm:"type:varchar(20);default:'balanced'" json:"csp_mode"` // "off", "balanced", "strict"
+	LLMShieldEnabled       bool      `gorm:"default:false" json:"llm_shield_enabled"`             // OWASP LLM Top 10 (Prompt Injection / PII / Model DoS)
 	RateLimitEnabled       bool      `gorm:"default:false" json:"rate_limit_enabled"`
 	RateLimitRPS           int       `gorm:"default:50" json:"rate_limit_rps"`
 	WhitelistedIPs         string    `gorm:"type:text" json:"whitelisted_ips"`

@@ -34,6 +34,7 @@ func setupComplianceTestDB(t *testing.T) *gorm.DB {
 		&db.ImageSBOM{},
 		&db.StoragePool{},
 		&db.StorageMount{},
+		&db.ManagedWAFConfig{},
 	)
 	if err != nil {
 		t.Fatalf("failed to auto-migrate: %v", err)
@@ -91,12 +92,12 @@ func TestEvaluateAllCompliance(t *testing.T) {
 	if overview.OverallScore <= 0 {
 		t.Errorf("expected positive overall score, got %.2f", overview.OverallScore)
 	}
-	if len(overview.Standards) != 5 {
-		t.Fatalf("expected 5 standards, got %d", len(overview.Standards))
+	if len(overview.Standards) != 6 {
+		t.Fatalf("expected 6 standards, got %d", len(overview.Standards))
 	}
 	if overview.Standards[0].Code != "ENS" || overview.Standards[1].Code != "NIS2" ||
 		overview.Standards[2].Code != "CIS" || overview.Standards[3].Code != "ISO27001" ||
-		overview.Standards[4].Code != "DORA" {
+		overview.Standards[4].Code != "DORA" || overview.Standards[5].Code != "OWASP" {
 		t.Errorf("unexpected standards order: %+v", overview.Standards)
 	}
 

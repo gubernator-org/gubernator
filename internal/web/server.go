@@ -437,12 +437,15 @@ func StartDashboard() {
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+	// OWASP ASVS L2/L3 Self-Hardening: Secure Headers & Anti-Brute-Force Rate Limiting
+	r.Use(auth.OWASPSecureHeadersMiddleware(true))
+	authRateLimiter := auth.AuthRateLimitMiddleware(20, 5*time.Minute)
 
 	// Public Auth endpoints
 	r.GET("/api/auth/providers", authProvidersHandler)
-	r.POST("/api/auth/login", authLoginHandler)
-	r.POST("/api/auth/mfa/verify", authMFAVerifyHandler)
-	r.POST("/api/auth/mfa/setup-complete", authMFASetupCompleteHandler)
+	r.POST("/api/auth/login", authRateLimiter, authLoginHandler)
+	r.POST("/api/auth/mfa/verify", authRateLimiter, authMFAVerifyHandler)
+	r.POST("/api/auth/mfa/setup-complete", authRateLimiter, authMFASetupCompleteHandler)
 	r.POST("/api/auth/logout", authLogoutHandler)
 	r.POST("/api/system/time-beacon", timeBeaconHandler)
 
@@ -507,6 +510,11 @@ func StartDashboard() {
 
 		api.GET("/security/dora/status", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), doraStatusHandler)
 		api.GET("/security/dora/report", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), doraReportHandler)
+		api.GET("/security/owasp/status", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), owaspStatusWebHandler)
+		api.GET("/security/owasp/report", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), owaspReportWebHandler)
+		api.GET("/security/owasp/dast/history", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), owaspDASTHistoryWebHandler)
+		api.POST("/security/owasp/dast/scan", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), owaspDASTScanWebHandler)
+		api.POST("/security/owasp/compose-lint", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), owaspComposeLintWebHandler)
 
 		// Unified Continuous Compliance & Regulatory Suite
 		api.GET("/security/compliance/overview", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), complianceOverviewHandler)
@@ -6061,6 +6069,14 @@ func authMeHandler(c *gin.Context) {
 
 func authLogoutHandler(c *gin.Context) {
 	sess := auth.ExtractUserSession(c)
+	// OWASP ASVS V3.5: Immediately revoke JWT on logout so stolen tokens cannot be replayed
+	if authHdr := c.GetHeader("Authorization"); strings.HasPrefix(authHdr, "Bearer ") {
+		auth.RevokeToken(strings.TrimPrefix(authHdr, "Bearer "))
+	}
+	if cookie, err := c.Cookie("gbnt_session"); err == nil && cookie != "" {
+		auth.RevokeToken(cookie)
+	}
+	c.SetCookie("gbnt_session", "", -1, "/", "", false, true)
 	username := "anonymous"
 	provider := "LOCAL"
 	if sess != nil {
@@ -7370,6 +7386,64 @@ func doraReportHandler(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=dora-compliance-report-%s.md", timestamp))
 	c.Header("Content-Type", "text/markdown; charset=utf-8")
 	c.String(http.StatusOK, report)
+}
+
+// ---------------------------------------------------------------------------
+// OWASP SECURITY SUITE (TOP 10, API, ASVS L2, DOCKER, LLM & DAST) HANDLERS
+// ---------------------------------------------------------------------------
+
+func owaspStatusWebHandler(c *gin.Context) {
+	summary := security.EvaluateOWASPCompliance(db.DB)
+	c.JSON(http.StatusOK, summary)
+}
+
+func owaspReportWebHandler(c *gin.Context) {
+	summary := security.EvaluateOWASPCompliance(db.DB)
+	format := strings.ToLower(c.DefaultQuery("format", "markdown"))
+	timestamp := time.Now().Format("20060102-150405")
+	if format == "json" {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=owasp-compliance-report-%s.json", timestamp))
+		c.Header("Content-Type", "application/json; charset=utf-8")
+		c.JSON(http.StatusOK, summary)
+		return
+	}
+	report := security.GenerateOWASPReport(summary, "markdown")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=owasp-compliance-report-%s.md", timestamp))
+	c.Header("Content-Type", "text/markdown; charset=utf-8")
+	c.String(http.StatusOK, report)
+}
+
+func owaspDASTHistoryWebHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, security.GetOWASPDASTHistory())
+}
+
+func owaspDASTScanWebHandler(c *gin.Context) {
+	var req security.OWASPDASTRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid DAST scan payload: " + err.Error()})
+		return
+	}
+	actor := "admin"
+	if sess := auth.ExtractUserSession(c); sess != nil && sess.Username != "" {
+		actor = sess.Username
+	}
+	res, err := security.RunOWASPDASTScan(req, actor)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func owaspComposeLintWebHandler(c *gin.Context) {
+	var req struct {
+		ComposeYAML string `json:"compose_yaml"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid compose payload: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, security.LintComposeOWASP(req.ComposeYAML))
 }
 
 // ---------------------------------------------------------------------------

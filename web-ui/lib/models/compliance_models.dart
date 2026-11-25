@@ -620,3 +620,288 @@ class ComplianceOverviewModel {
     return null;
   }
 }
+
+class OWASPControlModel {
+  final String id;
+  final String domain;
+  final String reference;
+  final String title;
+  final String description;
+  final String status;
+  final double score;
+  final String severity;
+  final String evidence;
+  final String remediation;
+
+  OWASPControlModel({
+    required this.id,
+    required this.domain,
+    required this.reference,
+    required this.title,
+    required this.description,
+    required this.status,
+    required this.score,
+    required this.severity,
+    required this.evidence,
+    required this.remediation,
+  });
+
+  factory OWASPControlModel.fromJson(Map<String, dynamic> json) {
+    return OWASPControlModel(
+      id: json['id'] ?? '',
+      domain: json['domain'] ?? 'TOP10_WEB',
+      reference: json['reference'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      status: json['status'] ?? 'NON_COMPLIANT',
+      score: (json['score'] as num?)?.toDouble() ?? 0.0,
+      severity: json['severity'] ?? 'MEDIUM',
+      evidence: json['evidence'] ?? '',
+      remediation: json['remediation'] ?? '',
+    );
+  }
+}
+
+class OWASPSummaryModel {
+  final String evaluatedAt;
+  final String standardVersion;
+  final double overallScore;
+  final String grade;
+  final double top10WebScore;
+  final double apiTop10Score;
+  final double asvsScore;
+  final double dockerTop10Score;
+  final double llmTop10Score;
+  final int compliantCount;
+  final int partialCount;
+  final int nonCompliantCount;
+  final int totalControls;
+  final List<String> exposedAiPorts;
+  final List<OWASPControlModel> controls;
+
+  OWASPSummaryModel({
+    required this.evaluatedAt,
+    required this.standardVersion,
+    required this.overallScore,
+    required this.grade,
+    required this.top10WebScore,
+    required this.apiTop10Score,
+    required this.asvsScore,
+    required this.dockerTop10Score,
+    required this.llmTop10Score,
+    required this.compliantCount,
+    required this.partialCount,
+    required this.nonCompliantCount,
+    required this.totalControls,
+    this.exposedAiPorts = const [],
+    this.controls = const [],
+  });
+
+  factory OWASPSummaryModel.fromJson(Map<String, dynamic> json) {
+    final ctrls = <OWASPControlModel>[];
+    if (json['controls'] is List) {
+      for (final c in json['controls']) {
+        if (c is Map<String, dynamic>) ctrls.add(OWASPControlModel.fromJson(c));
+      }
+    }
+    return OWASPSummaryModel(
+      evaluatedAt: json['evaluated_at'] ?? '',
+      standardVersion: json['standard_version'] ?? 'OWASP Security Suite',
+      overallScore: (json['overall_score'] as num?)?.toDouble() ?? 0.0,
+      grade: json['grade'] ?? 'C',
+      top10WebScore: (json['top10_web_score'] as num?)?.toDouble() ?? 0.0,
+      apiTop10Score: (json['api_top10_score'] as num?)?.toDouble() ?? 0.0,
+      asvsScore: (json['asvs_score'] as num?)?.toDouble() ?? 0.0,
+      dockerTop10Score: (json['docker_top10_score'] as num?)?.toDouble() ?? 0.0,
+      llmTop10Score: (json['llm_top10_score'] as num?)?.toDouble() ?? 0.0,
+      compliantCount: (json['compliant_count'] as num?)?.toInt() ?? 0,
+      partialCount: (json['partial_count'] as num?)?.toInt() ?? 0,
+      nonCompliantCount: (json['non_compliant_count'] as num?)?.toInt() ?? 0,
+      totalControls: (json['total_controls'] as num?)?.toInt() ?? 0,
+      exposedAiPorts: (json['exposed_ai_ports'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      controls: ctrls,
+    );
+  }
+}
+
+class OWASPDASTFindingModel {
+  final String wstgCode;
+  final String owaspRef;
+  final String severity;
+  final String status;
+  final String title;
+  final String evidence;
+  final String remediation;
+
+  OWASPDASTFindingModel({
+    required this.wstgCode,
+    required this.owaspRef,
+    required this.severity,
+    required this.status,
+    required this.title,
+    required this.evidence,
+    required this.remediation,
+  });
+
+  factory OWASPDASTFindingModel.fromJson(Map<String, dynamic> json) {
+    return OWASPDASTFindingModel(
+      wstgCode: json['wstg_code'] ?? '',
+      owaspRef: json['owasp_ref'] ?? '',
+      severity: json['severity'] ?? 'MEDIUM',
+      status: json['status'] ?? 'WARN',
+      title: json['title'] ?? '',
+      evidence: json['evidence'] ?? '',
+      remediation: json['remediation'] ?? '',
+    );
+  }
+}
+
+class OWASPDASTResultModel {
+  final String id;
+  final String targetUrl;
+  final String scannedAt;
+  final int durationMs;
+  final String scannerEngine;
+  final int httpStatus;
+  final String tlsVersion;
+  final double score;
+  final String grade;
+  final int passedChecks;
+  final int failedChecks;
+  final int warningChecks;
+  final int wafBlockedCount;
+  final int wafProbesRun;
+  final List<OWASPDASTFindingModel> findings;
+  final String zapOutput;
+  final String error;
+
+  OWASPDASTResultModel({
+    required this.id,
+    required this.targetUrl,
+    required this.scannedAt,
+    this.durationMs = 0,
+    this.scannerEngine = 'gubernator-wstg-native',
+    this.httpStatus = 0,
+    this.tlsVersion = '',
+    this.score = 0.0,
+    this.grade = 'F',
+    this.passedChecks = 0,
+    this.failedChecks = 0,
+    this.warningChecks = 0,
+    this.wafBlockedCount = 0,
+    this.wafProbesRun = 0,
+    this.findings = const [],
+    this.zapOutput = '',
+    this.error = '',
+  });
+
+  factory OWASPDASTResultModel.fromJson(Map<String, dynamic> json) {
+    final flist = <OWASPDASTFindingModel>[];
+    if (json['findings'] is List) {
+      for (final f in json['findings']) {
+        if (f is Map<String, dynamic>) flist.add(OWASPDASTFindingModel.fromJson(f));
+      }
+    }
+    return OWASPDASTResultModel(
+      id: json['id'] ?? '',
+      targetUrl: json['target_url'] ?? '',
+      scannedAt: json['scanned_at'] ?? '',
+      durationMs: (json['duration_ms'] as num?)?.toInt() ?? 0,
+      scannerEngine: json['scanner_engine'] ?? 'gubernator-wstg-native',
+      httpStatus: (json['http_status'] as num?)?.toInt() ?? 0,
+      tlsVersion: json['tls_version'] ?? '',
+      score: (json['score'] as num?)?.toDouble() ?? 0.0,
+      grade: json['grade'] ?? 'F',
+      passedChecks: (json['passed_checks'] as num?)?.toInt() ?? 0,
+      failedChecks: (json['failed_checks'] as num?)?.toInt() ?? 0,
+      warningChecks: (json['warning_checks'] as num?)?.toInt() ?? 0,
+      wafBlockedCount: (json['waf_blocked_count'] as num?)?.toInt() ?? 0,
+      wafProbesRun: (json['waf_probes_run'] as num?)?.toInt() ?? 0,
+      findings: flist,
+      zapOutput: json['zap_output'] ?? '',
+      error: json['error'] ?? '',
+    );
+  }
+}
+
+class OWASPComposeFindingModel {
+  final String ruleId;
+  final String owaspRef;
+  final String service;
+  final String severity;
+  final String title;
+  final String detail;
+  final String remediation;
+
+  OWASPComposeFindingModel({
+    required this.ruleId,
+    required this.owaspRef,
+    required this.service,
+    required this.severity,
+    required this.title,
+    required this.detail,
+    required this.remediation,
+  });
+
+  factory OWASPComposeFindingModel.fromJson(Map<String, dynamic> json) {
+    return OWASPComposeFindingModel(
+      ruleId: json['rule_id'] ?? '',
+      owaspRef: json['owasp_ref'] ?? '',
+      service: json['service'] ?? '',
+      severity: json['severity'] ?? 'MEDIUM',
+      title: json['title'] ?? '',
+      detail: json['detail'] ?? '',
+      remediation: json['remediation'] ?? '',
+    );
+  }
+}
+
+class OWASPComposeLintResultModel {
+  final bool valid;
+  final double score;
+  final String grade;
+  final int servicesAudited;
+  final int criticalCount;
+  final int highCount;
+  final int mediumCount;
+  final int lowCount;
+  final List<OWASPComposeFindingModel> findings;
+  final String hardeningSnippet;
+  final String parseError;
+
+  OWASPComposeLintResultModel({
+    this.valid = true,
+    this.score = 100.0,
+    this.grade = 'A+',
+    this.servicesAudited = 0,
+    this.criticalCount = 0,
+    this.highCount = 0,
+    this.mediumCount = 0,
+    this.lowCount = 0,
+    this.findings = const [],
+    this.hardeningSnippet = '',
+    this.parseError = '',
+  });
+
+  factory OWASPComposeLintResultModel.fromJson(Map<String, dynamic> json) {
+    final flist = <OWASPComposeFindingModel>[];
+    if (json['findings'] is List) {
+      for (final f in json['findings']) {
+        if (f is Map<String, dynamic>) flist.add(OWASPComposeFindingModel.fromJson(f));
+      }
+    }
+    return OWASPComposeLintResultModel(
+      valid: json['valid'] != false,
+      score: (json['score'] as num?)?.toDouble() ?? 0.0,
+      grade: json['grade'] ?? 'F',
+      servicesAudited: (json['services_audited'] as num?)?.toInt() ?? 0,
+      criticalCount: (json['critical_count'] as num?)?.toInt() ?? 0,
+      highCount: (json['high_count'] as num?)?.toInt() ?? 0,
+      mediumCount: (json['medium_count'] as num?)?.toInt() ?? 0,
+      lowCount: (json['low_count'] as num?)?.toInt() ?? 0,
+      findings: flist,
+      hardeningSnippet: json['hardening_snippet'] ?? '',
+      parseError: json['parse_error'] ?? '',
+    );
+  }
+}

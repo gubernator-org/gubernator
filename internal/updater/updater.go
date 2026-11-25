@@ -489,9 +489,9 @@ func downloadReleaseBinary(client *http.Client, targetVersion, goos, goarch, dst
 
 	// Try .gz first, then raw binary
 	candidates := []struct {
-		url      string
-		isGzip   bool
-		label    string
+		url    string
+		isGzip bool
+		label  string
 	}{
 		{url: baseURL + gzName, isGzip: true, label: "compressed"},
 		{url: baseURL + rawName, isGzip: false, label: "raw"},

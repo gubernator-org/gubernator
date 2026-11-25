@@ -61,6 +61,7 @@ type ComplianceOverview struct {
 	CIS               CISDockerSummary `json:"cis"`
 	ISO27001          ISO27001Summary  `json:"iso27001"`
 	DORA              DORASummary      `json:"dora"`
+	OWASP             OWASPSummary     `json:"owasp"`
 	DegradedStandards []string         `json:"degraded_standards,omitempty"`
 }
 
@@ -87,13 +88,14 @@ func EvaluateAllCompliance(database *gorm.DB, triggerSource string) ComplianceOv
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(5)
+	wg.Add(6)
 
 	var ens ENSSummary
 	var nis2 NIS2Summary
 	var cis CISDockerSummary
 	var iso ISO27001Summary
 	var dora DORASummary
+	var owasp OWASPSummary
 
 	go func() {
 		defer wg.Done()
@@ -120,6 +122,11 @@ func EvaluateAllCompliance(database *gorm.DB, triggerSource string) ComplianceOv
 		dora = EvaluateDORACompliance(database)
 	}()
 
+	go func() {
+		defer wg.Done()
+		owasp = EvaluateOWASPCompliance(database)
+	}()
+
 	wg.Wait()
 
 	now := time.Now().UTC()
@@ -138,6 +145,7 @@ func EvaluateAllCompliance(database *gorm.DB, triggerSource string) ComplianceOv
 	cisScore := cis.ScorePercent
 	isoScore := iso.OverallScore
 	doraScore := dora.OverallScore
+	owaspScore := owasp.OverallScore
 
 	// Update Prometheus metrics
 	complianceScoreGauge.WithLabelValues("ens").Set(ensScore)
@@ -145,8 +153,9 @@ func EvaluateAllCompliance(database *gorm.DB, triggerSource string) ComplianceOv
 	complianceScoreGauge.WithLabelValues("cis_docker").Set(cisScore)
 	complianceScoreGauge.WithLabelValues("iso27001").Set(isoScore)
 	complianceScoreGauge.WithLabelValues("dora").Set(doraScore)
+	complianceScoreGauge.WithLabelValues("owasp").Set(owaspScore)
 
-	overallScore := (ensScore + nis2Score + cisScore + isoScore + doraScore) / 5.0
+	overallScore := (ensScore + nis2Score + cisScore + isoScore + doraScore + owaspScore) / 6.0
 
 	overallStatus := "ACTION_REQUIRED"
 	if overallScore >= 95.0 {
@@ -208,6 +217,16 @@ func EvaluateAllCompliance(database *gorm.DB, triggerSource string) ComplianceOv
 			TotalMeasures:  dora.TotalMeasures,
 			EvaluatedAt:    now,
 		},
+		{
+			Name:           "OWASP Security Suite (Top 10/ASVS/API/Docker/LLM)",
+			Code:           "OWASP",
+			Score:          owaspScore,
+			Status:         owasp.Grade,
+			Category:       owasp.Grade,
+			CompliantCount: owasp.CompliantCount,
+			TotalMeasures:  owasp.TotalControls,
+			EvaluatedAt:    now,
+		},
 	}
 
 	overview := ComplianceOverview{
@@ -221,6 +240,7 @@ func EvaluateAllCompliance(database *gorm.DB, triggerSource string) ComplianceOv
 		CIS:           cis,
 		ISO27001:      iso,
 		DORA:          dora,
+		OWASP:         owasp,
 	}
 
 	// Degradation analysis against previous evaluation

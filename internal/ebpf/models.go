@@ -104,24 +104,24 @@ type InterfaceStats struct {
 
 // NodeTelemetry represents live kernel & network diagnostics from a single Centurion node.
 type NodeTelemetry struct {
-	NodeID           string           `json:"node_id"`
-	NodeIP           string           `json:"node_ip"`
-	Role             string           `json:"role"`
-	KernelVersion    string           `json:"kernel_version"`
-	EBPFSupported    bool             `json:"ebpf_supported"`
-	ActiveSockets    int              `json:"active_sockets"`
-	ListeningPorts   int              `json:"listening_ports"`
-	TCPRetransmits   int64            `json:"tcp_retransmits"`
-	SynDrops         int64            `json:"syn_drops"`
-	PacketDrops      int64            `json:"packet_drops"`
-	DNSLatencyMs     float64          `json:"dns_latency_ms"`
-	StorageIOLatMs   float64          `json:"storage_io_lat_ms"`
-	OpenFDs          int              `json:"open_fds"`
-	MaxFDs           int              `json:"max_fds"`
-	Interfaces       []InterfaceStats `json:"interfaces,omitempty"`
-	Status           string           `json:"status"` // "online", "degraded", "unreachable"
-	Error            string           `json:"error,omitempty"`
-	LastCollected    time.Time        `json:"last_collected"`
+	NodeID         string           `json:"node_id"`
+	NodeIP         string           `json:"node_ip"`
+	Role           string           `json:"role"`
+	KernelVersion  string           `json:"kernel_version"`
+	EBPFSupported  bool             `json:"ebpf_supported"`
+	ActiveSockets  int              `json:"active_sockets"`
+	ListeningPorts int              `json:"listening_ports"`
+	TCPRetransmits int64            `json:"tcp_retransmits"`
+	SynDrops       int64            `json:"syn_drops"`
+	PacketDrops    int64            `json:"packet_drops"`
+	DNSLatencyMs   float64          `json:"dns_latency_ms"`
+	StorageIOLatMs float64          `json:"storage_io_lat_ms"`
+	OpenFDs        int              `json:"open_fds"`
+	MaxFDs         int              `json:"max_fds"`
+	Interfaces     []InterfaceStats `json:"interfaces,omitempty"`
+	Status         string           `json:"status"` // "online", "degraded", "unreachable"
+	Error          string           `json:"error,omitempty"`
+	LastCollected  time.Time        `json:"last_collected"`
 }
 
 // NetworkStats contains global aggregate telemetry counters.
@@ -243,14 +243,14 @@ type ZeroTrustRule struct {
 
 // ZeroTrustBaseline summarizes the learned micro-segmentation model and exportable firewall policy.
 type ZeroTrustBaseline struct {
-	Locked          bool            `json:"locked"`
-	LockedAt        *time.Time      `json:"locked_at,omitempty"`
-	TotalRules      int             `json:"total_rules"`
-	DriftCount      int             `json:"drift_count"`
-	Rules           []ZeroTrustRule `json:"rules"`
-	NftablesPolicy  string          `json:"nftables_policy"`
-	IptablesPolicy  string          `json:"iptables_policy"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	Locked         bool            `json:"locked"`
+	LockedAt       *time.Time      `json:"locked_at,omitempty"`
+	TotalRules     int             `json:"total_rules"`
+	DriftCount     int             `json:"drift_count"`
+	Rules          []ZeroTrustRule `json:"rules"`
+	NftablesPolicy string          `json:"nftables_policy"`
+	IptablesPolicy string          `json:"iptables_policy"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 // ── Forensic Process ↔ Socket Timeline ──────────────────────────────────────

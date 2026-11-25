@@ -231,19 +231,19 @@ func (m *MultiNodeCollector) collectNode(nodeID, nodeIP, role string, declaredPo
 		fields := strings.Fields(line)
 		if len(fields) >= 4 {
 			surface = append(surface, AttackSurfaceEntry{
-				ID:            fmt.Sprintf("%s-raw-%s", nodeID, fields[0]),
-				NodeHost:      nodeID,
-				NodeIP:        nodeIP,
-				Protocol:      "RAW",
-				BindAddress:   "0.0.0.0",
-				Port:          0,
-				ProcessName:   "raw_socket",
-				Exposure:      "public_0.0.0.0",
-				IsShadow:      true,
-				IsRawSocket:   true,
-				RiskLevel:     "high",
-				RiskReason:    "Active RAW socket detected on host (potential packet sniffer or spoofing tool)",
-				LastSeen:      now,
+				ID:          fmt.Sprintf("%s-raw-%s", nodeID, fields[0]),
+				NodeHost:    nodeID,
+				NodeIP:      nodeIP,
+				Protocol:    "RAW",
+				BindAddress: "0.0.0.0",
+				Port:        0,
+				ProcessName: "raw_socket",
+				Exposure:    "public_0.0.0.0",
+				IsShadow:    true,
+				IsRawSocket: true,
+				RiskLevel:   "high",
+				RiskReason:  "Active RAW socket detected on host (potential packet sniffer or spoofing tool)",
+				LastSeen:    now,
 			})
 		}
 	}
@@ -392,10 +392,10 @@ func (m *MultiNodeCollector) collectNode(nodeID, nodeIP, role string, declaredPo
 					MitreTechnique: "T1190",
 					ComplianceRefs: []string{"ENS op.exp.1", "CIS Docker 2.5", "NIS2 Art.21"},
 					Evidence: map[string]string{
-						"bind":        entry.BindAddress,
-						"protocol":    entry.Protocol,
-						"declared":    fmt.Sprintf("%v", entry.DeclaredInCompose),
-						"process":     entry.ProcessName,
+						"bind":     entry.BindAddress,
+						"protocol": entry.Protocol,
+						"declared": fmt.Sprintf("%v", entry.DeclaredInCompose),
+						"process":  entry.ProcessName,
 					},
 				}, fmt.Sprintf("shadow:%s:%d", nodeID, entry.Port), 5*time.Minute)
 			}
