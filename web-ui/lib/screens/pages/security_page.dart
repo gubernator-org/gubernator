@@ -436,6 +436,225 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
     }
   }
 
+  Future<void> _confirmAndRemediateOWASPControl(OWASPControlModel control) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.auto_fix_high, color: Color(0xFF10B981)),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Remediate ${control.reference}', style: const TextStyle(fontSize: 16))),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(control.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+                ),
+                child: Text('Current Status: ${control.evidence}', style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+              ),
+              const SizedBox(height: 12),
+              const Text('Action to apply:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF10B981))),
+              const SizedBox(height: 4),
+              Text(
+                control.autoFixLabel.isNotEmpty ? '${control.autoFixLabel} — ${control.remediation}' : control.remediation,
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '• Updates cluster configuration immediately (Caddy WAF / Security Policy / eBPF Zero-Trust).\n'
+                '• Records an immutable SHA-256 entry in Forensic Audit Log.\n'
+                '• Automatically re-evaluates the OWASP compliance score.',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.bolt, size: 16),
+            label: const Text('Apply Remediation Now', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _remediateOWASPControl(control.id);
+    }
+  }
+
+  Future<void> _remediateDASTFinding(OWASPDASTFindingModel finding) async {
+    if (!finding.autoFixable || finding.remediateControlId.isEmpty) return;
+    setState(() {
+      _owaspRemediating = true;
+      _owaspRemediatingId = '${finding.wstgCode}:${finding.title}';
+    });
+    try {
+      final res = await ApiService.remediateOWASPControl(finding.remediateControlId);
+      if (mounted) {
+        setState(() {
+          if (res.updatedReport != null) _owaspSummary = res.updatedReport;
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        _loadComplianceOverview();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${res.message} — Re-scanning target URL to verify fix...'),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        await _runOWASPDAST();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('DAST remediation failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _remediateAllDASTFindings(OWASPDASTResultModel latest) async {
+    final controlIds = <String>{};
+    for (final f in latest.findings) {
+      if (f.status != 'PASS' && f.autoFixable && f.remediateControlId.isNotEmpty) {
+        controlIds.add(f.remediateControlId);
+      }
+    }
+    if (controlIds.isEmpty) return;
+    setState(() {
+      _owaspRemediating = true;
+      _owaspRemediatingId = 'dast-all';
+    });
+    final appliedActions = <String>[];
+    try {
+      for (final cid in controlIds) {
+        final res = await ApiService.remediateOWASPControl(cid);
+        if (res.updatedReport != null) {
+          _owaspSummary = res.updatedReport;
+        }
+        appliedActions.addAll(res.actionsTaken);
+      }
+      if (mounted) {
+        setState(() {
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        _loadComplianceOverview();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Applied ${appliedActions.length} remediation(s) for DAST findings — Re-scanning URL...'),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        await _runOWASPDAST();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bulk DAST remediation failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  void _openOWASPComposeAuditor({bool autoLoadFirstStack = true}) {
+    setState(() => _owaspSubView = 'compose');
+    if (autoLoadFirstStack && _owaspComposeCtrl.text.trim().isEmpty && widget.state.stacks.isNotEmpty) {
+      final candidate = widget.state.stacks.firstWhere(
+        (s) => s.rawComposeFile.trim().isNotEmpty,
+        orElse: () => widget.state.stacks.first,
+      );
+      if (candidate.rawComposeFile.trim().isNotEmpty) {
+        setState(() {
+          _owaspSelectedStackId = candidate.id;
+          _owaspLastChanges = [];
+        });
+        _owaspComposeCtrl.text = candidate.rawComposeFile;
+        _runOWASPComposeLint();
+      }
+    }
+  }
+
+  void _showOWASPManualGuideDialog({
+    required String title,
+    required String reference,
+    required String evidence,
+    required String remediation,
+    String? cliCommand,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.menu_book_outlined, color: Color(0xFF06B6D4)),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Guided Remediation — $reference', style: const TextStyle(fontSize: 16))),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              Text('Detected Evidence:\n$evidence', style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+              const SizedBox(height: 12),
+              const Text('Recommended Fix:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF10B981))),
+              const SizedBox(height: 4),
+              Text(remediation, style: const TextStyle(fontSize: 12)),
+              if (cliCommand != null && cliCommand.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text('CLI Equivalent:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFF0B1120), borderRadius: BorderRadius.circular(6)),
+                  child: SelectableText(cliCommand, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFFA5F3FC))),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Got it')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _loadComplianceOverview() async {
     setState(() => _complianceOverviewLoading = true);
     try {

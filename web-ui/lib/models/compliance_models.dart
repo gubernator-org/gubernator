@@ -738,6 +738,9 @@ class OWASPDASTFindingModel {
   final String title;
   final String evidence;
   final String remediation;
+  final bool autoFixable;
+  final String remediateControlId;
+  final String autoFixLabel;
 
   OWASPDASTFindingModel({
     required this.wstgCode,
@@ -747,6 +750,9 @@ class OWASPDASTFindingModel {
     required this.title,
     required this.evidence,
     required this.remediation,
+    this.autoFixable = false,
+    this.remediateControlId = '',
+    this.autoFixLabel = '',
   });
 
   factory OWASPDASTFindingModel.fromJson(Map<String, dynamic> json) {
@@ -758,6 +764,9 @@ class OWASPDASTFindingModel {
       title: json['title'] ?? '',
       evidence: json['evidence'] ?? '',
       remediation: json['remediation'] ?? '',
+      autoFixable: json['auto_fixable'] == true,
+      remediateControlId: json['remediate_control_id'] ?? '',
+      autoFixLabel: json['auto_fix_label'] ?? '',
     );
   }
 }

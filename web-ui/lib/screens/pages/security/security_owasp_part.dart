@@ -2,6 +2,7 @@ part of '../security_page.dart';
 
 extension _SecurityOwaspExt on _SecurityPageState {
   Widget _buildOWASPDashboardTab(bool isDark, Color primaryColor) {
+    final issueCount = (_owaspSummary?.nonCompliantCount ?? 0) + (_owaspSummary?.partialCount ?? 0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -12,11 +13,18 @@ extension _SecurityOwaspExt on _SecurityPageState {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             ChoiceChip(
+              avatar: const Icon(Icons.shield_outlined, size: 15),
               selected: _owaspSubView == 'compliance',
-              label: const Text('OWASP Compliance Matrix (Top 10 / API / ASVS / Docker / LLM)', style: TextStyle(fontSize: 12)),
+              label: Text(
+                issueCount > 0
+                    ? 'Compliance Matrix ($issueCount issues)'
+                    : 'Compliance Matrix (Top 10 / API / ASVS / Docker / LLM)',
+                style: const TextStyle(fontSize: 12),
+              ),
               onSelected: (_) => _updateState(() => _owaspSubView = 'compliance'),
             ),
             ChoiceChip(
+              avatar: const Icon(Icons.radar, size: 15),
               selected: _owaspSubView == 'dast',
               label: Text('Active WSTG DAST Scanner (${_owaspDastHistory.length})', style: const TextStyle(fontSize: 12)),
               onSelected: (_) {
@@ -25,13 +33,37 @@ extension _SecurityOwaspExt on _SecurityPageState {
               },
             ),
             ChoiceChip(
+              avatar: const Icon(Icons.fact_check_outlined, size: 15),
               selected: _owaspSubView == 'compose',
               label: const Text('Compose Docker Top 10 Auditor (D01-D10)', style: TextStyle(fontSize: 12)),
-              onSelected: (_) => _updateState(() => _owaspSubView = 'compose'),
+              onSelected: (_) => _openOWASPComposeAuditor(autoLoadFirstStack: true),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
+        // Clear 1-line how-to strip so remediation workflow is immediately obvious
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.08 : 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.28)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.bolt, size: 16, color: Color(0xFF10B981)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Interactive OWASP Remediation: Click "Remediate" on any red/amber control, DAST vulnerability, or Compose finding to apply real cluster hardening (Caddy WAF, Secure Headers, Security Policy, Zero-Trust or Compose YAML) with automatic re-verification & SHA-256 audit logging.',
+                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         Expanded(
           child: switch (_owaspSubView) {
             'dast' => _buildOWASPDASTView(isDark, primaryColor),
@@ -217,22 +249,33 @@ extension _SecurityOwaspExt on _SecurityPageState {
               margin: const EdgeInsets.only(bottom: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: col.withValues(alpha: 0.35)),
+                side: BorderSide(color: col.withValues(alpha: 0.4)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _owaspPill(c.reference, Colors.cyan),
-                        _owaspPill(c.status, col),
-                        _owaspPill(c.severity, c.severity == 'CRITICAL' ? Colors.redAccent : Colors.orangeAccent),
-                        Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _owaspPill(c.reference, Colors.cyan),
+                              _owaspPill(c.status, col),
+                              _owaspPill(c.severity, c.severity == 'CRITICAL' ? Colors.redAccent : Colors.orangeAccent),
+                              Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        if (c.status != 'COMPLIANT') ...[
+                          const SizedBox(width: 10),
+                          _buildControlActionButton(c),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -241,35 +284,9 @@ extension _SecurityOwaspExt on _SecurityPageState {
                     Text('Evidence: ${c.evidence}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
                     if (c.status != 'COMPLIANT') ...[
                       const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Remediation: ${c.remediation}',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: col),
-                            ),
-                          ),
-                          if (c.autoFixable) ...[
-                            const SizedBox(width: 10),
-                            FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.2),
-                                foregroundColor: const Color(0xFF10B981),
-                                side: const BorderSide(color: Color(0xFF10B981)),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              ),
-                              onPressed: _owaspRemediating ? null : () => _remediateOWASPControl(c.id),
-                              icon: _owaspRemediating && _owaspRemediatingId == c.id
-                                  ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : const Icon(Icons.build_circle_outlined, size: 14),
-                              label: Text(
-                                c.autoFixLabel.isNotEmpty ? c.autoFixLabel : 'Apply Auto-Fix',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        'Remediation: ${c.remediation}',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: col),
                       ),
                     ],
                   ],
@@ -282,8 +299,89 @@ extension _SecurityOwaspExt on _SecurityPageState {
     );
   }
 
+  Widget _buildControlActionButton(OWASPControlModel c) {
+    final isBusy = _owaspRemediating && _owaspRemediatingId == c.id;
+
+    // 1. Direct 1-click Auto-Remediation controls (backend-backed)
+    if (c.autoFixable) {
+      return Tooltip(
+        message: c.autoFixLabel.isNotEmpty ? c.autoFixLabel : 'Apply automatic cluster remediation',
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF10B981),
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          onPressed: _owaspRemediating ? null : () => _confirmAndRemediateOWASPControl(c),
+          icon: isBusy
+              ? const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+              : const Icon(Icons.bolt, size: 15),
+          label: Text(
+            c.autoFixLabel.isNotEmpty ? 'Remediate: ${c.autoFixLabel}' : 'Remediate',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+    }
+
+    // 2. Docker Compose controls (D01 / D05) -> Jump directly into Compose Auto-Hardener!
+    if (c.id == 'owasp-d01' || c.id == 'owasp-d05') {
+      return FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF06B6D4),
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        onPressed: () => _openOWASPComposeAuditor(autoLoadFirstStack: true),
+        icon: const Icon(Icons.auto_fix_high, size: 15),
+        label: const Text('Remediate Stacks (Compose Auditor)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+      );
+    }
+
+    // 3. RBAC Access Control (A01) -> Jump directly to Local Users & MFA tab
+    if (c.id == 'owasp-a01') {
+      return OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF06B6D4),
+          side: const BorderSide(color: Color(0xFF06B6D4)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        onPressed: () => _tabController.animateTo(0),
+        icon: const Icon(Icons.manage_accounts_outlined, size: 15),
+        label: const Text('Remediate: Manage RBAC Users', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+      );
+    }
+
+    // 4. Other guided controls (A06 SBOM, A02 Backups, ASVS V7)
+    String? cliHint;
+    if (c.id == 'owasp-a06') {
+      cliHint = 'gbnt scan <image:tag> && gbnt sbom <image:tag>';
+    } else if (c.id == 'owasp-a02') {
+      cliHint = 'gbnt backup create --encrypt <volume>';
+    }
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.amber,
+        side: const BorderSide(color: Colors.amber),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      onPressed: () => _showOWASPManualGuideDialog(
+        title: c.title,
+        reference: c.reference,
+        evidence: c.evidence,
+        remediation: c.remediation,
+        cliCommand: cliHint,
+      ),
+      icon: const Icon(Icons.menu_book_outlined, size: 15),
+      label: const Text('Remediate Guide', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+    );
+  }
+
   Widget _buildOWASPDASTView(bool isDark, Color primaryColor) {
     final latest = _owaspLatestDast ?? (_owaspDastHistory.isNotEmpty ? _owaspDastHistory.first : null);
+    final fixableCount = latest == null
+        ? 0
+        : latest.findings.where((f) => f.status != 'PASS' && f.autoFixable && f.remediateControlId.isNotEmpty).length;
 
     return SingleChildScrollView(
       child: Column(
@@ -309,7 +407,7 @@ extension _SecurityOwaspExt on _SecurityPageState {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Audits TLS, OWASP Secure Headers, Cookie flags, CORS policy, TRACE method, exposed dotfiles (.env/.git), and active WAF blocking.',
+                    'Audits TLS, OWASP Secure Headers, Cookie flags, CORS policy, TRACE method, exposed dotfiles (.env/.git), and active WAF blocking — with 1-click remediation & auto re-scan on findings.',
                     style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
                   ),
                   const SizedBox(height: 12),
@@ -370,18 +468,40 @@ extension _SecurityOwaspExt on _SecurityPageState {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        _owaspPill('GRADE ${latest.grade} (${latest.score.toStringAsFixed(1)}%)', _owaspGradeColor(latest.grade)),
-                        _owaspPill('HTTP ${latest.httpStatus}', Colors.blueAccent),
-                        if (latest.tlsVersion.isNotEmpty) _owaspPill(latest.tlsVersion, const Color(0xFF10B981)),
-                        if (latest.wafProbesRun > 0)
-                          _owaspPill('WAF Blocked ${latest.wafBlockedCount}/${latest.wafProbesRun}', Colors.purpleAccent),
-                        Text(latest.targetUrl, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
-                        Text('(${latest.durationMs}ms)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 10,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _owaspPill('GRADE ${latest.grade} (${latest.score.toStringAsFixed(1)}%)', _owaspGradeColor(latest.grade)),
+                              _owaspPill('HTTP ${latest.httpStatus}', Colors.blueAccent),
+                              if (latest.tlsVersion.isNotEmpty) _owaspPill(latest.tlsVersion, const Color(0xFF10B981)),
+                              if (latest.wafProbesRun > 0)
+                                _owaspPill('WAF Blocked ${latest.wafBlockedCount}/${latest.wafProbesRun}', Colors.purpleAccent),
+                              Text(latest.targetUrl, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                              Text('(${latest.durationMs}ms)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        if (fixableCount > 0) ...[
+                          const SizedBox(width: 10),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.black,
+                            ),
+                            onPressed: (_owaspRemediating || _owaspDastRunning) ? null : () => _remediateAllDASTFindings(latest),
+                            icon: _owaspRemediating && _owaspRemediatingId == 'dast-all'
+                                ? const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                                : const Icon(Icons.auto_fix_high, size: 15),
+                            label: Text('Remediate All ($fixableCount) & Re-Scan',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
                       ],
                     ),
                     if (latest.error.isNotEmpty)
@@ -394,23 +514,89 @@ extension _SecurityOwaspExt on _SecurityPageState {
                       final col = f.status == 'PASS'
                           ? const Color(0xFF10B981)
                           : (f.status == 'WARN' ? Colors.amber : Colors.redAccent);
-                      return ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          f.status == 'PASS' ? Icons.check_circle : (f.status == 'WARN' ? Icons.warning_amber : Icons.cancel),
-                          color: col,
-                          size: 18,
+                      final findingKey = '${f.wstgCode}:${f.title}';
+                      final isBusy = _owaspRemediating && _owaspRemediatingId == findingKey;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: f.status == 'PASS'
+                              ? Colors.transparent
+                              : col.withValues(alpha: isDark ? 0.06 : 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: col.withValues(alpha: f.status == 'PASS' ? 0.2 : 0.4)),
                         ),
-                        title: Wrap(
-                          spacing: 6,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            _owaspPill(f.wstgCode, Colors.cyan),
-                            Text(f.title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Icon(
+                              f.status == 'PASS' ? Icons.check_circle : (f.status == 'WARN' ? Icons.warning_amber : Icons.cancel),
+                              color: col,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      _owaspPill(f.wstgCode, Colors.cyan),
+                                      if (f.status != 'PASS') _owaspPill(f.severity, col),
+                                      Text(f.title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${f.evidence}${f.status != 'PASS' ? '\nFix: ${f.remediation}' : ''}',
+                                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (f.status != 'PASS') ...[
+                              const SizedBox(width: 10),
+                              if (f.autoFixable && f.remediateControlId.isNotEmpty)
+                                Tooltip(
+                                  message: f.autoFixLabel.isNotEmpty ? '${f.autoFixLabel} (auto re-scans URL)' : 'Apply automatic fix & re-scan',
+                                  child: FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                    ),
+                                    onPressed: (_owaspRemediating || _owaspDastRunning) ? null : () => _remediateDASTFinding(f),
+                                    icon: isBusy
+                                        ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                                        : const Icon(Icons.bolt, size: 14),
+                                    label: Text(
+                                      f.autoFixLabel.isNotEmpty ? 'Remediate' : 'Fix',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                )
+                              else
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.amber,
+                                    side: const BorderSide(color: Colors.amber),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                  ),
+                                  onPressed: () => _showOWASPManualGuideDialog(
+                                    title: f.title,
+                                    reference: '${f.wstgCode} (${f.owaspRef})',
+                                    evidence: f.evidence,
+                                    remediation: f.remediation,
+                                  ),
+                                  icon: const Icon(Icons.menu_book_outlined, size: 14),
+                                  label: const Text('Guide', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
                           ],
                         ),
-                        subtitle: Text('${f.evidence}${f.status != 'PASS' ? '\nFix: ${f.remediation}' : ''}',
-                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
                       );
                     }),
                     if (latest.zapOutput.isNotEmpty) ...[
@@ -436,6 +622,7 @@ extension _SecurityOwaspExt on _SecurityPageState {
 
   Widget _buildOWASPComposeAuditorView(bool isDark, Color primaryColor) {
     final res = _owaspComposeResult;
+    final validSelectedStack = widget.state.stacks.any((s) => s.id == _owaspSelectedStackId) ? _owaspSelectedStackId : null;
 
     return SingleChildScrollView(
       child: Column(
@@ -452,26 +639,36 @@ extension _SecurityOwaspExt on _SecurityPageState {
                     children: [
                       const Icon(Icons.fact_check_outlined, color: Color(0xFF06B6D4), size: 20),
                       const SizedBox(width: 8),
-                      const Text('OWASP Docker Top 10 (D01-D10) Compose Shift-Left Auditor',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const Spacer(),
+                      const Expanded(
+                        child: Text('OWASP Docker Top 10 (D01-D10) Compose Shift-Left Auditor',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
                       if (widget.state.stacks.isNotEmpty)
-                        DropdownButton<String>(
-                          hint: const Text('Load Deployed Stack...', style: TextStyle(fontSize: 12)),
-                          underline: const SizedBox(),
-                          items: widget.state.stacks
-                              .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, style: const TextStyle(fontSize: 12))))
-                              .toList(),
-                          onChanged: (stackId) {
-                            if (stackId == null) return;
-                            final st = widget.state.stacks.firstWhere((s) => s.id == stackId);
-                            _updateState(() {
-                              _owaspSelectedStackId = stackId;
-                              _owaspLastChanges = [];
-                            });
-                            _owaspComposeCtrl.text = st.rawComposeFile;
-                            _runOWASPComposeLint();
-                          },
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.45)),
+                          ),
+                          child: DropdownButton<String>(
+                            value: validSelectedStack,
+                            hint: const Text('Select Deployed Stack...', style: TextStyle(fontSize: 12)),
+                            underline: const SizedBox(),
+                            isDense: true,
+                            items: widget.state.stacks
+                                .map((s) => DropdownMenuItem(value: s.id, child: Text('Stack: ${s.name}', style: const TextStyle(fontSize: 12))))
+                                .toList(),
+                            onChanged: (stackId) {
+                              if (stackId == null) return;
+                              final st = widget.state.stacks.firstWhere((s) => s.id == stackId);
+                              _updateState(() {
+                                _owaspSelectedStackId = stackId;
+                                _owaspLastChanges = [];
+                              });
+                              _owaspComposeCtrl.text = st.rawComposeFile;
+                              _runOWASPComposeLint();
+                            },
+                          ),
                         ),
                     ],
                   ),
@@ -502,14 +699,14 @@ extension _SecurityOwaspExt on _SecurityPageState {
                         ),
                         onPressed: _owaspComposeLinting ? null : _hardenOWASPCompose,
                         icon: const Icon(Icons.auto_fix_high, size: 16),
-                        label: const Text('Auto-Harden YAML (1-Click)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text('Remediate & Auto-Harden YAML (1-Click)', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                       if (_owaspSelectedStackId != null && _owaspLastChanges.isNotEmpty)
                         FilledButton.icon(
                           style: FilledButton.styleFrom(backgroundColor: const Color(0xFF06B6D4), foregroundColor: Colors.black),
                           onPressed: _saveHardenedComposeToStack,
                           icon: const Icon(Icons.save_outlined, size: 16),
-                          label: const Text('Save Hardened YAML to Stack'),
+                          label: const Text('Save Hardened YAML to Stack', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       if (res != null && res.hardeningSnippet.isNotEmpty)
                         OutlinedButton.icon(
@@ -583,13 +780,52 @@ extension _SecurityOwaspExt on _SecurityPageState {
                       const Text('Zero OWASP Docker Top 10 issues found! Compose manifest is hardened.',
                           style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold))
                     else
-                      ...res.findings.map((f) => ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: _owaspPill(f.ruleId, f.severity == 'CRITICAL' ? Colors.redAccent : Colors.orangeAccent),
-                            title: Text('[${f.service}] ${f.title}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            subtitle: Text('${f.detail}\nFix: ${f.remediation}', style: const TextStyle(fontSize: 11)),
-                          )),
+                      ...res.findings.map((f) {
+                        final sevCol = f.severity == 'CRITICAL'
+                            ? Colors.redAccent
+                            : (f.severity == 'HIGH' ? Colors.orangeAccent : Colors.amber);
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: sevCol.withValues(alpha: isDark ? 0.06 : 0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: sevCol.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _owaspPill(f.ruleId, sevCol),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('[${f.service}] ${f.title}',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 3),
+                                    Text('${f.detail}\nFix: ${f.remediation}', style: const TextStyle(fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Tooltip(
+                                message: 'Auto-harden this Compose YAML to remediate ${f.ruleId}',
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                  ),
+                                  onPressed: _owaspComposeLinting ? null : _hardenOWASPCompose,
+                                  icon: const Icon(Icons.bolt, size: 14),
+                                  label: const Text('Remediate', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                   ],
                 ),
               ),

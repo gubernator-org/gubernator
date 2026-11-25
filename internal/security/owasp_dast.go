@@ -27,13 +27,16 @@ type OWASPDASTRequest struct {
 
 // OWASPDASTFinding represents an individual WSTG / OWASP Top 10 finding discovered during a DAST scan.
 type OWASPDASTFinding struct {
-	WSTGCode    string `json:"wstg_code"` // e.g. "WSTG-CONF-07", "WSTG-CRYP-01", "WSTG-SESS-02"
-	OWASPRef    string `json:"owasp_ref"` // e.g. "A05:2021", "A02:2021"
-	Severity    string `json:"severity"`  // "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
-	Status      string `json:"status"`    // "PASS", "FAIL", "WARN"
-	Title       string `json:"title"`
-	Evidence    string `json:"evidence"`
-	Remediation string `json:"remediation"`
+	WSTGCode           string `json:"wstg_code"` // e.g. "WSTG-CONF-07", "WSTG-CRYP-01", "WSTG-SESS-02"
+	OWASPRef           string `json:"owasp_ref"` // e.g. "A05:2021", "A02:2021"
+	Severity           string `json:"severity"`  // "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
+	Status             string `json:"status"`    // "PASS", "FAIL", "WARN"
+	Title              string `json:"title"`
+	Evidence           string `json:"evidence"`
+	Remediation        string `json:"remediation"`
+	AutoFixable        bool   `json:"auto_fixable,omitempty"`
+	RemediateControlID string `json:"remediate_control_id,omitempty"`
+	AutoFixLabel       string `json:"auto_fix_label,omitempty"`
 }
 
 // OWASPDASTResult stores the complete scorecard and findings of an OWASP WSTG DAST scan.
@@ -225,13 +228,16 @@ func RunOWASPDASTScan(req OWASPDASTRequest, actor string) (*OWASPDASTResult, err
 			}, 0)
 		} else if !sh.httpsReq || parsed.Scheme == "https" {
 			record(OWASPDASTFinding{
-				WSTGCode:    "WSTG-CONF-07",
-				OWASPRef:    "A05:2021",
-				Severity:    sh.severity,
-				Status:      "FAIL",
-				Title:       fmt.Sprintf("Missing OWASP Security Header: %s", sh.key),
-				Evidence:    fmt.Sprintf("Response did not include `%s`.", sh.key),
-				Remediation: "Enable 'Inject OWASP Secure Headers' in Caddy Ingress -> Threat Shield WAF.",
+				WSTGCode:           "WSTG-CONF-07",
+				OWASPRef:           "A05:2021",
+				Severity:           sh.severity,
+				Status:             "FAIL",
+				Title:              fmt.Sprintf("Missing OWASP Security Header: %s", sh.key),
+				Evidence:           fmt.Sprintf("Response did not include `%s`.", sh.key),
+				Remediation:        "Enable 'Inject OWASP Secure Headers' in Caddy Ingress -> Threat Shield WAF.",
+				AutoFixable:        true,
+				RemediateControlID: "owasp-a05",
+				AutoFixLabel:       "Enable OWASP Secure Headers",
 			}, sh.pts)
 		}
 	}
@@ -240,25 +246,31 @@ func RunOWASPDASTScan(req OWASPDASTRequest, actor string) (*OWASPDASTResult, err
 	if srv := resp.Header.Get("Server"); srv != "" {
 		result.HeadersPresent["Server"] = srv
 		record(OWASPDASTFinding{
-			WSTGCode:    "WSTG-INFO-02",
-			OWASPRef:    "A05:2021",
-			Severity:    "LOW",
-			Status:      "WARN",
-			Title:       "Server Banner Fingerprinting Exposed",
-			Evidence:    fmt.Sprintf("Server: %s", srv),
-			Remediation: "Strip `Server` and `X-Powered-By` headers via Caddy WAF Secure Headers.",
+			WSTGCode:           "WSTG-INFO-02",
+			OWASPRef:           "A05:2021",
+			Severity:           "LOW",
+			Status:             "WARN",
+			Title:              "Server Banner Fingerprinting Exposed",
+			Evidence:           fmt.Sprintf("Server: %s", srv),
+			Remediation:        "Strip `Server` and `X-Powered-By` headers via Caddy WAF Secure Headers.",
+			AutoFixable:        true,
+			RemediateControlID: "owasp-a05",
+			AutoFixLabel:       "Strip Server Headers (WAF)",
 		}, 4)
 	}
 	if xpb := resp.Header.Get("X-Powered-By"); xpb != "" {
 		result.HeadersPresent["X-Powered-By"] = xpb
 		record(OWASPDASTFinding{
-			WSTGCode:    "WSTG-INFO-02",
-			OWASPRef:    "A05:2021",
-			Severity:    "LOW",
-			Status:      "WARN",
-			Title:       "X-Powered-By Technology Disclosure",
-			Evidence:    fmt.Sprintf("X-Powered-By: %s", xpb),
-			Remediation: "Strip `X-Powered-By` header in application or reverse proxy.",
+			WSTGCode:           "WSTG-INFO-02",
+			OWASPRef:           "A05:2021",
+			Severity:           "LOW",
+			Status:             "WARN",
+			Title:              "X-Powered-By Technology Disclosure",
+			Evidence:           fmt.Sprintf("X-Powered-By: %s", xpb),
+			Remediation:        "Strip `X-Powered-By` header in application or reverse proxy.",
+			AutoFixable:        true,
+			RemediateControlID: "owasp-a05",
+			AutoFixLabel:       "Strip X-Powered-By (WAF)",
 		}, 4)
 	}
 
@@ -325,13 +337,16 @@ func RunOWASPDASTScan(req OWASPDASTRequest, actor string) (*OWASPDASTResult, err
 		_ = traceResp.Body.Close()
 		if traceResp.StatusCode == http.StatusOK {
 			record(OWASPDASTFinding{
-				WSTGCode:    "WSTG-CONF-06",
-				OWASPRef:    "A05:2021",
-				Severity:    "MEDIUM",
-				Status:      "FAIL",
-				Title:       "HTTP TRACE Method Enabled (Cross-Site Tracing Risk)",
-				Evidence:    "TRACE request returned 200 OK",
-				Remediation: "Enable OWASP CRS-911 HTTP Method Enforcement in Caddy WAF.",
+				WSTGCode:           "WSTG-CONF-06",
+				OWASPRef:           "A05:2021",
+				Severity:           "MEDIUM",
+				Status:             "FAIL",
+				Title:              "HTTP TRACE Method Enabled (Cross-Site Tracing Risk)",
+				Evidence:           "TRACE request returned 200 OK",
+				Remediation:        "Enable OWASP CRS-911 HTTP Method Enforcement in Caddy WAF.",
+				AutoFixable:        true,
+				RemediateControlID: "owasp-a05",
+				AutoFixLabel:       "Block TRACE Method (CRS-911)",
 			}, 10)
 		} else {
 			record(OWASPDASTFinding{
@@ -370,13 +385,16 @@ func RunOWASPDASTScan(req OWASPDASTRequest, actor string) (*OWASPDASTResult, err
 	}
 	if len(exposedFound) > 0 {
 		record(OWASPDASTFinding{
-			WSTGCode:    "WSTG-CONF-04",
-			OWASPRef:    "A05:2021",
-			Severity:    "CRITICAL",
-			Status:      "FAIL",
-			Title:       "Sensitive Configuration / Repository Files Publicly Accessible",
-			Evidence:    fmt.Sprintf("Accessible sensitive paths: %s", strings.Join(exposedFound, ", ")),
-			Remediation: "Remove exposed dotfiles immediately and enable Caddy WAF Paranoia Level >= 2.",
+			WSTGCode:           "WSTG-CONF-04",
+			OWASPRef:           "A05:2021",
+			Severity:           "CRITICAL",
+			Status:             "FAIL",
+			Title:              "Sensitive Configuration / Repository Files Publicly Accessible",
+			Evidence:           fmt.Sprintf("Accessible sensitive paths: %s", strings.Join(exposedFound, ", ")),
+			Remediation:        "Remove exposed dotfiles immediately and enable Caddy WAF Paranoia Level >= 2.",
+			AutoFixable:        true,
+			RemediateControlID: "owasp-a03",
+			AutoFixLabel:       "Enable WAF Paranoia L2",
 		}, 25)
 	} else {
 		record(OWASPDASTFinding{
@@ -419,14 +437,23 @@ func RunOWASPDASTScan(req OWASPDASTRequest, actor string) (*OWASPDASTResult, err
 						Remediation: "WAF enforcement verified.",
 					}, 0)
 				} else {
+					remediateCtrl := "owasp-a03"
+					remediateLbl := "Enforce Caddy WAF CRS"
+					if pr.name == "SSRF" {
+						remediateCtrl = "owasp-a10"
+						remediateLbl = "Enable SSRF Shield & Zero-Trust"
+					}
 					record(OWASPDASTFinding{
-						WSTGCode:    pr.code,
-						OWASPRef:    "A03:2021",
-						Severity:    "MEDIUM",
-						Status:      "WARN",
-						Title:       fmt.Sprintf("WAF Did Not Block %s Probe (HTTP %d)", pr.name, pResp.StatusCode),
-						Evidence:    fmt.Sprintf("Probe %s returned HTTP %d (WAF may be disabled, in detection mode, or IP whitelisted)", pr.name, pResp.StatusCode),
-						Remediation: "Enable Caddy Threat Shield WAF in 'enforce' mode for this route.",
+						WSTGCode:           pr.code,
+						OWASPRef:           "A03:2021",
+						Severity:           "MEDIUM",
+						Status:             "WARN",
+						Title:              fmt.Sprintf("WAF Did Not Block %s Probe (HTTP %d)", pr.name, pResp.StatusCode),
+						Evidence:           fmt.Sprintf("Probe %s returned HTTP %d (WAF may be disabled, in detection mode, or IP whitelisted)", pr.name, pResp.StatusCode),
+						Remediation:        "Enable Caddy Threat Shield WAF in 'enforce' mode for this route.",
+						AutoFixable:        true,
+						RemediateControlID: remediateCtrl,
+						AutoFixLabel:       remediateLbl,
 					}, 6)
 				}
 			}

@@ -114,13 +114,23 @@ func TestOWASPDASTScanner(t *testing.T) {
 		t.Fatalf("expected HTTP 200 and >= 1 WAF probe blocked, got status=%d waf=%d", res.HTTPStatus, res.WAFBlockedCount)
 	}
 	foundEnvLeak := false
+	foundFixableHeader := false
 	for _, f := range res.Findings {
 		if f.WSTGCode == "WSTG-CONF-04" && f.Status == "FAIL" {
 			foundEnvLeak = true
+			if !f.AutoFixable || f.RemediateControlID != "owasp-a03" {
+				t.Fatalf("expected WSTG-CONF-04 to map to auto-fixable owasp-a03, got %+v", f)
+			}
+		}
+		if f.WSTGCode == "WSTG-INFO-02" && f.Status == "WARN" && f.AutoFixable && f.RemediateControlID == "owasp-a05" {
+			foundFixableHeader = true
 		}
 	}
 	if !foundEnvLeak {
 		t.Fatalf("expected WSTG-CONF-04 FAIL for exposed /.env, got %+v", res.Findings)
+	}
+	if !foundFixableHeader {
+		t.Fatalf("expected WSTG-INFO-02 WARN to be auto-fixable via owasp-a05, got %+v", res.Findings)
 	}
 }
 
