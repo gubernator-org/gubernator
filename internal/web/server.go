@@ -515,6 +515,9 @@ func StartDashboard() {
 		api.GET("/security/owasp/dast/history", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), owaspDASTHistoryWebHandler)
 		api.POST("/security/owasp/dast/scan", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), owaspDASTScanWebHandler)
 		api.POST("/security/owasp/compose-lint", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), owaspComposeLintWebHandler)
+		api.POST("/security/owasp/compose-harden", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), owaspComposeHardenWebHandler)
+		api.POST("/security/owasp/remediate/:id", auth.RequireRole(auth.RoleAdmin), owaspRemediateWebHandler)
+		api.POST("/security/owasp/remediate-all", auth.RequireRole(auth.RoleAdmin), owaspRemediateAllWebHandler)
 
 		// Unified Continuous Compliance & Regulatory Suite
 		api.GET("/security/compliance/overview", auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor, auth.RoleOperator, auth.RoleReadOnly), complianceOverviewHandler)
@@ -7444,6 +7447,49 @@ func owaspComposeLintWebHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, security.LintComposeOWASP(req.ComposeYAML))
+}
+
+func owaspComposeHardenWebHandler(c *gin.Context) {
+	var req struct {
+		ComposeYAML string `json:"compose_yaml"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid compose payload: " + err.Error()})
+		return
+	}
+	res, err := security.HardenComposeOWASP(req.ComposeYAML)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func owaspRemediateWebHandler(c *gin.Context) {
+	id := c.Param("id")
+	actor := "admin"
+	if sess := auth.ExtractUserSession(c); sess != nil && sess.Username != "" {
+		actor = sess.Username
+	}
+	res, err := security.RemediateOWASPControl(db.DB, id, actor)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func owaspRemediateAllWebHandler(c *gin.Context) {
+	actor := "admin"
+	if sess := auth.ExtractUserSession(c); sess != nil && sess.Username != "" {
+		actor = sess.Username
+	}
+	res, err := security.RemediateAllSafeOWASP(db.DB, actor)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
 }
 
 // ---------------------------------------------------------------------------

@@ -30,16 +30,18 @@ const (
 
 // OWASPControl represents a single verifiable OWASP security control evaluated against live cluster state.
 type OWASPControl struct {
-	ID          string      `json:"id"`          // e.g. "A01:2021", "API4:2023", "ASVS-V3.5", "D05", "LLM01"
-	Domain      OWASPDomain `json:"domain"`      // TOP10_WEB, API_TOP10, ASVS_L2, DOCKER_TOP10, LLM_TOP10
-	Reference   string      `json:"reference"`   // Formal OWASP reference code
-	Title       string      `json:"title"`       // Control title
-	Description string      `json:"description"` // Requirement summary
-	Status      string      `json:"status"`      // "COMPLIANT", "PARTIAL", "NON_COMPLIANT"
-	Score       float64     `json:"score"`       // 0.0 - 100.0
-	Severity    string      `json:"severity"`    // "CRITICAL", "HIGH", "MEDIUM", "LOW"
-	Evidence    string      `json:"evidence"`    // Live discovered cluster evidence
-	Remediation string      `json:"remediation"` // Prescriptive remediation guidance
+	ID           string      `json:"id"`                       // e.g. "A01:2021", "API4:2023", "ASVS-V3.5", "D05", "LLM01"
+	Domain       OWASPDomain `json:"domain"`                   // TOP10_WEB, API_TOP10, ASVS_L2, DOCKER_TOP10, LLM_TOP10
+	Reference    string      `json:"reference"`                // Formal OWASP reference code
+	Title        string      `json:"title"`                    // Control title
+	Description  string      `json:"description"`              // Requirement summary
+	Status       string      `json:"status"`                   // "COMPLIANT", "PARTIAL", "NON_COMPLIANT"
+	Score        float64     `json:"score"`                    // 0.0 - 100.0
+	Severity     string      `json:"severity"`                 // "CRITICAL", "HIGH", "MEDIUM", "LOW"
+	Evidence     string      `json:"evidence"`                 // Live discovered cluster evidence
+	Remediation  string      `json:"remediation"`              // Prescriptive remediation guidance
+	AutoFixable  bool        `json:"auto_fixable"`             // True if Gubernator can remediate with 1 click
+	AutoFixLabel string      `json:"auto_fix_label,omitempty"` // Short CTA label for the UI button
 }
 
 // OWASPSummary aggregates the evaluation across all 5 OWASP standards.
@@ -111,7 +113,33 @@ func EvaluateOWASPCompliance(database *gorm.DB) OWASPSummary {
 	ztBaseline := eng.IDS.GetZeroTrustBaseline()
 
 	var controls []OWASPControl
-	add := func(c OWASPControl) { controls = append(controls, c) }
+	add := func(c OWASPControl) {
+		if c.Status != "COMPLIANT" {
+			switch c.ID {
+			case "owasp-a03":
+				c.AutoFixable, c.AutoFixLabel = true, "Enable Caddy WAF CRS (Enforce)"
+			case "owasp-a05":
+				c.AutoFixable, c.AutoFixLabel = true, "Enable OWASP Secure Headers & CRS-911"
+			case "owasp-a07":
+				c.AutoFixable, c.AutoFixLabel = true, "Enforce Mandatory MFA & Lockout"
+			case "owasp-a08":
+				c.AutoFixable, c.AutoFixLabel = true, "Enforce Gatekeeper & Cosign Policy"
+			case "owasp-a09":
+				c.AutoFixable, c.AutoFixLabel = true, "Enable SIEM Audit Forwarding"
+			case "owasp-a10":
+				c.AutoFixable, c.AutoFixLabel = true, "Enable SSRF WAF & Lock Zero-Trust"
+			case "owasp-asvs-v2":
+				c.AutoFixable, c.AutoFixLabel = true, "Enforce 12+ Char Password Policy"
+			case "owasp-asvs-v3":
+				c.AutoFixable, c.AutoFixLabel = true, "Set 15m Session Inactivity Timeout"
+			case "owasp-llm01":
+				c.AutoFixable, c.AutoFixLabel = true, "Enable OWASP LLM01 Prompt Shield"
+			case "owasp-api9":
+				c.AutoFixable, c.AutoFixLabel = true, "Re-Scan Multi-Node Attack Surface"
+			}
+		}
+		controls = append(controls, c)
+	}
 
 	// ── 1. OWASP TOP 10:2021 (WEB) ───────────────────────────────────────────
 

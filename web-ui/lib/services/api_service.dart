@@ -1027,4 +1027,10 @@ class ApiService {
       ImageComplianceApi.runOWASPDASTScan(targetUrl: targetUrl, probeWaf: probeWaf, includeZap: includeZap);
   static Future<OWASPComposeLintResultModel> lintComposeOWASP(String composeYaml) =>
       ImageComplianceApi.lintComposeOWASP(composeYaml);
+  static Future<OWASPRemediationResultModel> remediateOWASPControl(String controlId) =>
+      ImageComplianceApi.remediateOWASPControl(controlId);
+  static Future<OWASPRemediationResultModel> remediateAllSafeOWASP() =>
+      ImageComplianceApi.remediateAllSafeOWASP();
+  static Future<OWASPComposeHardenResultModel> hardenComposeOWASP(String composeYaml) =>
+      ImageComplianceApi.hardenComposeOWASP(composeYaml);
 }

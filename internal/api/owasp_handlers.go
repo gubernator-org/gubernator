@@ -93,3 +93,58 @@ func SecurityOWASPComposeLintHandler(c *gin.Context) {
 	res := security.LintComposeOWASP(req.ComposeYAML)
 	c.JSON(http.StatusOK, res)
 }
+
+// SecurityOWASPRemediateHandler applies a 1-click cluster auto-remediation for a specific OWASP control.
+// @Summary Auto-remediate a specific OWASP control
+// @Tags security
+// @Produce json
+// @Param id path string true "OWASP Control ID (e.g. owasp-a03, owasp-a05, owasp-a10)"
+// @Success 200 {object} security.OWASPRemediationResult
+// @Router /v1/security/owasp/remediate/{id} [post]
+func SecurityOWASPRemediateHandler(c *gin.Context) {
+	id := c.Param("id")
+	res, err := security.RemediateOWASPControl(db.DB, id, c.GetString("username"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+// SecurityOWASPRemediateAllHandler applies all safe, non-disruptive OWASP cluster remediations in 1 click.
+// @Summary Auto-remediate all safe OWASP controls
+// @Tags security
+// @Produce json
+// @Success 200 {object} security.OWASPRemediationResult
+// @Router /v1/security/owasp/remediate-all [post]
+func SecurityOWASPRemediateAllHandler(c *gin.Context) {
+	res, err := security.RemediateAllSafeOWASP(db.DB, c.GetString("username"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+// SecurityOWASPComposeHardenHandler automatically hardens a docker-compose.yml against OWASP Docker Top 10.
+// @Summary Auto-harden docker-compose.yml against OWASP Docker Top 10
+// @Tags security
+// @Accept json
+// @Produce json
+// @Success 200 {object} security.OWASPComposeHardenResult
+// @Router /v1/security/owasp/compose-harden [post]
+func SecurityOWASPComposeHardenHandler(c *gin.Context) {
+	var req struct {
+		ComposeYAML string `json:"compose_yaml"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+	res, err := security.HardenComposeOWASP(req.ComposeYAML)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}

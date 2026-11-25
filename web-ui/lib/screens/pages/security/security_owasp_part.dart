@@ -127,6 +127,18 @@ extension _SecurityOwaspExt on _SecurityPageState {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (summary.nonCompliantCount > 0 || summary.partialCount > 0)
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _owaspRemediating ? null : _remediateAllSafeOWASP,
+                        icon: _owaspRemediating && _owaspRemediatingId == 'all-safe'
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                            : const Icon(Icons.auto_fix_high, size: 15),
+                        label: const Text('Auto-Fix All (Safe)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
                     OutlinedButton.icon(
                       onPressed: _loadOWASPStatus,
                       icon: const Icon(Icons.refresh, size: 15),
@@ -229,9 +241,35 @@ extension _SecurityOwaspExt on _SecurityPageState {
                     Text('Evidence: ${c.evidence}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
                     if (c.status != 'COMPLIANT') ...[
                       const SizedBox(height: 6),
-                      Text(
-                        'Remediation: ${c.remediation}',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: col),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Remediation: ${c.remediation}',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: col),
+                            ),
+                          ),
+                          if (c.autoFixable) ...[
+                            const SizedBox(width: 10),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                foregroundColor: const Color(0xFF10B981),
+                                side: const BorderSide(color: Color(0xFF10B981)),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              ),
+                              onPressed: _owaspRemediating ? null : () => _remediateOWASPControl(c.id),
+                              icon: _owaspRemediating && _owaspRemediatingId == c.id
+                                  ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.build_circle_outlined, size: 14),
+                              label: Text(
+                                c.autoFixLabel.isNotEmpty ? c.autoFixLabel : 'Apply Auto-Fix',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ],
@@ -427,6 +465,10 @@ extension _SecurityOwaspExt on _SecurityPageState {
                           onChanged: (stackId) {
                             if (stackId == null) return;
                             final st = widget.state.stacks.firstWhere((s) => s.id == stackId);
+                            _updateState(() {
+                              _owaspSelectedStackId = stackId;
+                              _owaspLastChanges = [];
+                            });
                             _owaspComposeCtrl.text = st.rawComposeFile;
                             _runOWASPComposeLint();
                           },
@@ -444,15 +486,32 @@ extension _SecurityOwaspExt on _SecurityPageState {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
                     children: [
                       FilledButton.icon(
                         onPressed: _owaspComposeLinting ? null : _runOWASPComposeLint,
                         icon: const Icon(Icons.security, size: 16),
                         label: const Text('Audit Compose YAML'),
                       ),
-                      if (res != null && res.hardeningSnippet.isNotEmpty) ...[
-                        const SizedBox(width: 10),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _owaspComposeLinting ? null : _hardenOWASPCompose,
+                        icon: const Icon(Icons.auto_fix_high, size: 16),
+                        label: const Text('Auto-Harden YAML (1-Click)', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      if (_owaspSelectedStackId != null && _owaspLastChanges.isNotEmpty)
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF06B6D4), foregroundColor: Colors.black),
+                          onPressed: _saveHardenedComposeToStack,
+                          icon: const Icon(Icons.save_outlined, size: 16),
+                          label: const Text('Save Hardened YAML to Stack'),
+                        ),
+                      if (res != null && res.hardeningSnippet.isNotEmpty)
                         OutlinedButton.icon(
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: res.hardeningSnippet));
@@ -461,11 +520,31 @@ extension _SecurityOwaspExt on _SecurityPageState {
                             );
                           },
                           icon: const Icon(Icons.copy, size: 15),
-                          label: const Text('Copy Auto-Hardening Snippet'),
+                          label: const Text('Copy Snippet'),
                         ),
-                      ],
                     ],
                   ),
+                  if (_owaspLastChanges.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Applied ${_owaspLastChanges.length} Auto-Hardening Fix(es):',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                          const SizedBox(height: 4),
+                          ..._owaspLastChanges.map((ch) => Text('• $ch', style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

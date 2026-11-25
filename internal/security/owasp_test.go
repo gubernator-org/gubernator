@@ -163,3 +163,44 @@ func TestOWASPWAFSnippetAndJWTRevocation(t *testing.T) {
 		t.Fatalf("expected revoked token to fail validation")
 	}
 }
+
+func TestOWASPAutoRemediationAndComposeHardening(t *testing.T) {
+	database := setupComplianceTestDB(t)
+
+	// 1. Safe bulk auto-remediation should raise the OWASP compliance score
+	res, err := RemediateAllSafeOWASP(database, "tester")
+	if err != nil || !res.Success {
+		t.Fatalf("RemediateAllSafeOWASP failed: err=%v res=%+v", err, res)
+	}
+	if res.AfterScore <= res.BeforeScore {
+		t.Fatalf("expected OWASP score to improve after auto-remediation: before=%.1f after=%.1f", res.BeforeScore, res.AfterScore)
+	}
+	if len(res.ActionsTaken) < 4 {
+		t.Fatalf("expected >= 4 remediation actions, got %d", len(res.ActionsTaken))
+	}
+
+	// 2. Compose Auto-Hardening should fix privileged, docker.sock, host net, plaintext secret, root user, limits & exposed DB port
+	insecure := `
+services:
+  api:
+    image: nginx:1.27-alpine
+    privileged: true
+    network_mode: host
+    ports:
+      - "5432:5432"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DB_PASSWORD=hardcodedsecret
+`
+	hardened, err := HardenComposeOWASP(insecure)
+	if err != nil || !hardened.Success {
+		t.Fatalf("HardenComposeOWASP failed: %v", err)
+	}
+	if hardened.AfterScore <= hardened.BeforeScore || hardened.AfterScore < 95.0 {
+		t.Fatalf("expected hardened score >= 95%% (from %.1f%%), got %.1f%%; changes=%v", hardened.BeforeScore, hardened.AfterScore, hardened.ChangesApplied)
+	}
+	if !strings.Contains(hardened.HardenedYAML, "${DB_PASSWORD}") || strings.Contains(hardened.HardenedYAML, "privileged") {
+		t.Fatalf("expected secrets externalized and privileged removed, got:\n%s", hardened.HardenedYAML)
+	}
+}

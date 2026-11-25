@@ -632,6 +632,8 @@ class OWASPControlModel {
   final String severity;
   final String evidence;
   final String remediation;
+  final bool autoFixable;
+  final String autoFixLabel;
 
   OWASPControlModel({
     required this.id,
@@ -644,6 +646,8 @@ class OWASPControlModel {
     required this.severity,
     required this.evidence,
     required this.remediation,
+    this.autoFixable = false,
+    this.autoFixLabel = '',
   });
 
   factory OWASPControlModel.fromJson(Map<String, dynamic> json) {
@@ -658,6 +662,8 @@ class OWASPControlModel {
       severity: json['severity'] ?? 'MEDIUM',
       evidence: json['evidence'] ?? '',
       remediation: json['remediation'] ?? '',
+      autoFixable: json['auto_fixable'] == true,
+      autoFixLabel: json['auto_fix_label'] ?? '',
     );
   }
 }
@@ -902,6 +908,71 @@ class OWASPComposeLintResultModel {
       findings: flist,
       hardeningSnippet: json['hardening_snippet'] ?? '',
       parseError: json['parse_error'] ?? '',
+    );
+  }
+}
+
+class OWASPRemediationResultModel {
+  final bool success;
+  final String controlId;
+  final List<String> actionsTaken;
+  final String message;
+  final double beforeScore;
+  final double afterScore;
+  final OWASPSummaryModel? updatedReport;
+
+  OWASPRemediationResultModel({
+    this.success = false,
+    this.controlId = '',
+    this.actionsTaken = const [],
+    this.message = '',
+    this.beforeScore = 0.0,
+    this.afterScore = 0.0,
+    this.updatedReport,
+  });
+
+  factory OWASPRemediationResultModel.fromJson(Map<String, dynamic> json) {
+    return OWASPRemediationResultModel(
+      success: json['success'] == true,
+      controlId: json['control_id'] ?? '',
+      actionsTaken: (json['actions_taken'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      message: json['message'] ?? '',
+      beforeScore: (json['before_score'] as num?)?.toDouble() ?? 0.0,
+      afterScore: (json['after_score'] as num?)?.toDouble() ?? 0.0,
+      updatedReport: json['updated_report'] is Map<String, dynamic>
+          ? OWASPSummaryModel.fromJson(json['updated_report'])
+          : null,
+    );
+  }
+}
+
+class OWASPComposeHardenResultModel {
+  final bool success;
+  final double beforeScore;
+  final double afterScore;
+  final List<String> changesApplied;
+  final String hardenedYaml;
+  final OWASPComposeLintResultModel? auditResult;
+
+  OWASPComposeHardenResultModel({
+    this.success = false,
+    this.beforeScore = 0.0,
+    this.afterScore = 0.0,
+    this.changesApplied = const [],
+    this.hardenedYaml = '',
+    this.auditResult,
+  });
+
+  factory OWASPComposeHardenResultModel.fromJson(Map<String, dynamic> json) {
+    return OWASPComposeHardenResultModel(
+      success: json['success'] == true,
+      beforeScore: (json['before_score'] as num?)?.toDouble() ?? 0.0,
+      afterScore: (json['after_score'] as num?)?.toDouble() ?? 0.0,
+      changesApplied: (json['changes_applied'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      hardenedYaml: json['hardened_yaml'] ?? '',
+      auditResult: json['audit_result'] is Map<String, dynamic>
+          ? OWASPComposeLintResultModel.fromJson(json['audit_result'])
+          : null,
     );
   }
 }

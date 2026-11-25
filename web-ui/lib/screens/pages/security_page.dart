@@ -123,6 +123,10 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
   final TextEditingController _owaspComposeCtrl = TextEditingController();
   OWASPComposeLintResultModel? _owaspComposeResult;
   bool _owaspComposeLinting = false;
+  bool _owaspRemediating = false;
+  String? _owaspRemediatingId;
+  String? _owaspSelectedStackId;
+  List<String> _owaspLastChanges = [];
 
   @override
   void initState() {
@@ -271,6 +275,165 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
       ..click();
     html.Url.revokeObjectUrl(url);
     a.remove();
+  }
+
+  Future<void> _remediateOWASPControl(String controlId) async {
+    setState(() {
+      _owaspRemediating = true;
+      _owaspRemediatingId = controlId;
+    });
+    try {
+      final res = await ApiService.remediateOWASPControl(controlId);
+      if (mounted) {
+        setState(() {
+          if (res.updatedReport != null) _owaspSummary = res.updatedReport;
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        _loadComplianceOverview();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Remediation failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _remediateAllSafeOWASP() async {
+    setState(() {
+      _owaspRemediating = true;
+      _owaspRemediatingId = 'all-safe';
+    });
+    try {
+      final res = await ApiService.remediateAllSafeOWASP();
+      if (mounted) {
+        setState(() {
+          if (res.updatedReport != null) _owaspSummary = res.updatedReport;
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        _loadComplianceOverview();
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.auto_fix_high, color: Color(0xFF10B981)),
+                SizedBox(width: 8),
+                Text('OWASP Auto-Remediation Applied'),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(res.message, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    ...res.actionsTaken.map((a) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.check_circle, size: 15, color: Color(0xFF10B981)),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(a, style: const TextStyle(fontSize: 12))),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Done')),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _owaspRemediating = false;
+          _owaspRemediatingId = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bulk remediation failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _hardenOWASPCompose() async {
+    final yaml = _owaspComposeCtrl.text.trim();
+    if (yaml.isEmpty) return;
+    setState(() => _owaspComposeLinting = true);
+    try {
+      final res = await ApiService.hardenComposeOWASP(yaml);
+      if (mounted) {
+        setState(() {
+          _owaspComposeCtrl.text = res.hardenedYaml;
+          _owaspComposeResult = res.auditResult;
+          _owaspLastChanges = res.changesApplied;
+          _owaspComposeLinting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Auto-hardened Compose YAML: ${res.beforeScore.toStringAsFixed(1)}% -> ${res.afterScore.toStringAsFixed(1)}% (${res.changesApplied.length} fixes)',
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _owaspComposeLinting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Auto-hardening failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveHardenedComposeToStack() async {
+    final stackId = _owaspSelectedStackId;
+    if (stackId == null || stackId.isEmpty) return;
+    final ok = await ApiService.updateStackCompose(stackId, _owaspComposeCtrl.text);
+    if (mounted) {
+      if (ok) {
+        widget.onRefresh();
+        _loadOWASPStatus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Hardened Compose saved to stack! Redeploy the stack from Legions to apply to running containers.'),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save Compose to stack'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
   }
 
   Future<void> _loadComplianceOverview() async {

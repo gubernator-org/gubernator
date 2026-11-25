@@ -638,4 +638,41 @@ class ImageComplianceApi {
     }
     throw Exception('OWASP Compose lint failed: ${response.body}');
   }
+
+  /// Applies a 1-click cluster auto-remediation for a specific OWASP control.
+  static Future<OWASPRemediationResultModel> remediateOWASPControl(String controlId) async {
+    final response = await http.post(
+      Uri.parse('/api/security/owasp/remediate/$controlId'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return OWASPRemediationResultModel.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('OWASP remediation failed: ${response.body}');
+  }
+
+  /// Applies all safe, non-disruptive OWASP cluster remediations in 1 click.
+  static Future<OWASPRemediationResultModel> remediateAllSafeOWASP() async {
+    final response = await http.post(
+      Uri.parse('/api/security/owasp/remediate-all'),
+      headers: authHeaders,
+    );
+    if (response.statusCode == 200) {
+      return OWASPRemediationResultModel.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('OWASP bulk remediation failed: ${response.body}');
+  }
+
+  /// Automatically hardens a docker-compose.yml manifest against OWASP Docker Top 10.
+  static Future<OWASPComposeHardenResultModel> hardenComposeOWASP(String composeYaml) async {
+    final response = await http.post(
+      Uri.parse('/api/security/owasp/compose-harden'),
+      headers: authHeaders,
+      body: jsonEncode({'compose_yaml': composeYaml}),
+    );
+    if (response.statusCode == 200) {
+      return OWASPComposeHardenResultModel.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('OWASP Compose hardening failed: ${response.body}');
+  }
 }

@@ -106,11 +106,35 @@ var owaspLintCmd = &cobra.Command{
 	},
 }
 
+var owaspFixCmd = &cobra.Command{
+	Use:   "fix [control-id]",
+	Short: "Auto-remediate a specific OWASP control (e.g. owasp-a03) or all safe controls when omitted",
+	Run: func(cmd *cobra.Command, args []string) {
+		endpoint := "/v1/security/owasp/remediate-all"
+		if len(args) > 0 {
+			endpoint = "/v1/security/owasp/remediate/" + args[0]
+		}
+		resp, err := DoAPIRequest("POST", endpoint, nil)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to connect to Manager: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var res security.OWASPRemediationResult
+		_ = json.NewDecoder(resp.Body).Decode(&res)
+		fmt.Printf("%s\n", res.Message)
+		for _, act := range res.ActionsTaken {
+			fmt.Printf("  • %s\n", act)
+		}
+	},
+}
+
 func init() {
 	owaspScanCmd.Flags().BoolVar(&owaspScanWAF, "waf", true, "Run benign SQLi/XSS/LFI/SSRF WAF enforcement probes")
 	owaspScanCmd.Flags().BoolVar(&owaspScanZAP, "zap", false, "Also run OWASP ZAP Baseline container (requires Docker)")
 	owaspCmd.AddCommand(owaspStatusCmd)
 	owaspCmd.AddCommand(owaspScanCmd)
 	owaspCmd.AddCommand(owaspLintCmd)
+	owaspCmd.AddCommand(owaspFixCmd)
 	rootCmd.AddCommand(owaspCmd)
 }
