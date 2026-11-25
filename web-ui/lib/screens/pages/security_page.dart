@@ -127,10 +127,14 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    final origin = html.window.location.origin;
+    if (origin.isNotEmpty) {
+      _owaspDastUrlCtrl.text = origin;
+    }
     _tabController = TabController(
-      length: 5,
+      length: 6,
       vsync: this,
-      initialIndex: widget.selectedSubIndex.clamp(0, 4),
+      initialIndex: widget.selectedSubIndex.clamp(0, 5),
     );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging && mounted) {
@@ -146,6 +150,9 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
           if (_isoSummary == null && !_isoLoading) _loadISO27001Status();
           if (_doraSummary == null && !_doraLoading) _loadDORAStatus();
           if (_owaspSummary == null && !_owaspLoading) _loadOWASPStatus();
+        } else if (_tabController.index == 5) {
+          if (_owaspSummary == null && !_owaspLoading) _loadOWASPStatus();
+          if (_owaspDastHistory.isEmpty) _loadOWASPDASTHistory();
         }
       }
     });
@@ -156,7 +163,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
   void didUpdateWidget(SecurityPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
-      final target = widget.selectedSubIndex.clamp(0, 4);
+      final target = widget.selectedSubIndex.clamp(0, 5);
       if (_tabController.index != target) {
         _tabController.animateTo(target);
       }
@@ -665,6 +672,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                   _buildOIDCTab(isDark, primaryColor),
                   _buildAuditLogsTab(isDark, primaryColor),
                   _buildComplianceHubTab(isDark, primaryColor),
+                  _buildOWASPDashboardTab(isDark, primaryColor),
                 ],
               ),
             ),
