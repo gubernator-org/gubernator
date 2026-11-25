@@ -25,6 +25,7 @@ import 'pages/storage_page.dart';
 import 'pages/image_security_page.dart';
 import 'pages/compose_studio_page.dart';
 import 'pages/ebpf_page.dart';
+import 'pages/owasp_page.dart';
 import 'pages/opensearch_dashboards_page.dart';
 import 'pages/opensearch_discover_page.dart';
 import 'pages/opensearch_traces_page.dart';
@@ -715,6 +716,29 @@ class _AppShellState extends State<AppShell> {
               ),
             ],
           ),
+          SidebarItem(
+            index: 17,
+            icon: Icons.verified_user_outlined,
+            activeIcon: Icons.verified_user,
+            label: 'OWASP Security Suite',
+            subItems: [
+              SidebarSubItem(
+                subIndex: 0,
+                icon: Icons.checklist_rtl_outlined,
+                label: 'OWASP Compliance Matrix',
+              ),
+              SidebarSubItem(
+                subIndex: 1,
+                icon: Icons.radar,
+                label: 'WSTG DAST Scanner (+ ZAP)',
+              ),
+              SidebarSubItem(
+                subIndex: 2,
+                icon: Icons.fact_check_outlined,
+                label: 'Compose Docker Auditor',
+              ),
+            ],
+          ),
         ],
       ),
     ];
@@ -739,6 +763,7 @@ class _AppShellState extends State<AppShell> {
     'eBPF Live Hub',
     'Security & Directory',
     'Compose Studio',
+    'OWASP Security Suite',
   ];
 
   String? _getSubPageLabel(List<SidebarSection> sections, int index, int subIndex) {
@@ -911,6 +936,12 @@ class _AppShellState extends State<AppShell> {
         );
       case 16:
         return ComposeStudioPage(state: _state, onRefresh: _fetchData);
+      case 17:
+        return OwaspPage(
+          state: _state,
+          selectedSubIndex: _selectedSubIndex,
+          onNavigateDestination: (idx) => _selectDestination(idx),
+        );
       default:
         return OverviewPage(
           state: _state,
