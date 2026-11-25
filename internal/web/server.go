@@ -555,11 +555,29 @@ func StartDashboard() {
 		api.GET("/logs/query", logsQueryHandler)
 		api.GET("/logs/export", logsExportHandler)
 
-		// eBPF Live Hub & Kernel Network Observability
+		// eBPF Live Hub & Kernel Network Observability + Runtime IDS / Purple Team / DFIR
 		api.GET("/ebpf/stats", ebpfStatsWebHandler)
 		api.GET("/ebpf/flows", ebpfFlowsWebHandler)
 		api.GET("/ebpf/topology", ebpfTopologyWebHandler)
-		api.POST("/ebpf/simulate", ebpfSimulateWebHandler)
+		api.POST("/ebpf/simulate", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfSimulateWebHandler)
+		api.POST("/ebpf/mode", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfModeWebHandler)
+		api.GET("/ebpf/nodes", ebpfNodesWebHandler)
+		api.GET("/ebpf/alerts", ebpfAlertsWebHandler)
+		api.POST("/ebpf/alerts/:id/ack", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfAlertAckWebHandler)
+		api.DELETE("/ebpf/alerts", auth.RequireRole(auth.RoleAdmin), ebpfAlertsClearWebHandler)
+		api.GET("/ebpf/attack-surface", ebpfAttackSurfaceWebHandler)
+		api.POST("/ebpf/attack-surface/scan", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfAttackSurfaceScanWebHandler)
+		api.GET("/ebpf/zero-trust", ebpfZeroTrustWebHandler)
+		api.POST("/ebpf/zero-trust/lock", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfZeroTrustLockWebHandler)
+		api.GET("/ebpf/processes", ebpfProcessesWebHandler)
+		api.GET("/ebpf/quarantine", ebpfQuarantineListWebHandler)
+		api.POST("/ebpf/quarantine", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfQuarantineCreateWebHandler)
+		api.POST("/ebpf/quarantine/:id/release", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfQuarantineReleaseWebHandler)
+		api.GET("/ebpf/pcap", ebpfPCAPListWebHandler)
+		api.POST("/ebpf/pcap/capture", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfPCAPCaptureWebHandler)
+		api.GET("/ebpf/pcap/:id/download", ebpfPCAPDownloadWebHandler)
+		api.GET("/ebpf/purple-team/scenarios", ebpfPurpleTeamScenariosWebHandler)
+		api.POST("/ebpf/purple-team/run", auth.RequireRole(auth.RoleAdmin, auth.RoleOperator), ebpfPurpleTeamRunWebHandler)
 		api.GET("/ebpf/stream", ebpfStreamWebHandler)
 
 		// Server Stacks & Built-in POC Examples
@@ -9164,9 +9182,11 @@ func ebpfFlowsWebHandler(c *gin.Context) {
 	proto := c.Query("protocol")
 	status := c.Query("status")
 	query := c.Query("q")
+	node := c.Query("node")
+	realOnly := c.Query("real_only") == "true"
 
 	eng := ebpf.GetEngine()
-	flows := eng.Probe.GetRecentFlows(limit, proto, status, query)
+	flows := eng.Probe.GetRecentFlowsFiltered(limit, proto, status, query, node, realOnly)
 	if flows == nil {
 		flows = []ebpf.Flow{}
 	}
@@ -9189,6 +9209,202 @@ func ebpfSimulateWebHandler(c *gin.Context) {
 	eng := ebpf.GetEngine()
 	eng.SimulateTraffic(profile)
 	c.JSON(http.StatusOK, gin.H{"status": "Simulation triggered successfully", "pattern": profile.Pattern})
+}
+
+func ebpfModeWebHandler(c *gin.Context) {
+	var req ebpf.TelemetryModeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid mode payload: " + err.Error()})
+		return
+	}
+	eng := ebpf.GetEngine()
+	eng.Probe.SetSyntheticPulse(req.SyntheticPulse)
+	if req.TriggerScan {
+		eng.TriggerMultiNodeScan()
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"synthetic_pulse": eng.Probe.IsSyntheticPulse(),
+		"status":          "updated",
+	})
+}
+
+func ebpfNodesWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	snaps := eng.Collector.GetNodeSnapshots()
+	if snaps == nil {
+		snaps = []ebpf.NodeTelemetry{}
+	}
+	c.JSON(http.StatusOK, snaps)
+}
+
+func ebpfAlertsWebHandler(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	eng := ebpf.GetEngine()
+	alerts := eng.IDS.GetAlerts(c.Query("severity"), c.Query("category"), c.Query("status"), limit)
+	if alerts == nil {
+		alerts = []ebpf.SecurityAlert{}
+	}
+	c.JSON(http.StatusOK, alerts)
+}
+
+func ebpfAlertAckWebHandler(c *gin.Context) {
+	id := c.Param("id")
+	var body struct {
+		Status string `json:"status"`
+	}
+	_ = c.ShouldBindJSON(&body)
+	eng := ebpf.GetEngine()
+	a, ok := eng.IDS.AcknowledgeAlert(id, body.Status)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Alert not found"})
+		return
+	}
+	c.JSON(http.StatusOK, a)
+}
+
+func ebpfAlertsClearWebHandler(c *gin.Context) {
+	onlySim := c.Query("simulated_only") == "true"
+	eng := ebpf.GetEngine()
+	removed := eng.IDS.ClearAlerts(onlySim)
+	c.JSON(http.StatusOK, gin.H{"removed": removed})
+}
+
+func ebpfAttackSurfaceWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	entries := eng.Collector.GetAttackSurface(c.Query("node"), c.Query("shadow_only") == "true")
+	if entries == nil {
+		entries = []ebpf.AttackSurfaceEntry{}
+	}
+	c.JSON(http.StatusOK, entries)
+}
+
+func ebpfAttackSurfaceScanWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	eng.Collector.CollectAll(eng.Probe, eng.IDS)
+	entries := eng.Collector.GetAttackSurface("", false)
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "completed",
+		"entries": len(entries),
+		"nodes":   len(eng.Collector.GetNodeSnapshots()),
+	})
+}
+
+func ebpfZeroTrustWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	c.JSON(http.StatusOK, eng.IDS.GetZeroTrustBaseline())
+}
+
+func ebpfZeroTrustLockWebHandler(c *gin.Context) {
+	var req struct {
+		Locked        bool `json:"locked"`
+		ResetAndLearn bool `json:"reset_and_learn"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	eng := ebpf.GetEngine()
+	c.JSON(http.StatusOK, eng.IDS.SetBaselineLocked(req.Locked, req.ResetAndLearn))
+}
+
+func ebpfProcessesWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	procs := eng.Collector.GetProcessSockets(c.Query("node"), c.Query("q"))
+	if procs == nil {
+		procs = []ebpf.ProcessSocketEntry{}
+	}
+	c.JSON(http.StatusOK, procs)
+}
+
+func ebpfQuarantineListWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	recs := eng.Forensics.GetQuarantines()
+	if recs == nil {
+		recs = []ebpf.QuarantineRecord{}
+	}
+	c.JSON(http.StatusOK, recs)
+}
+
+func ebpfQuarantineCreateWebHandler(c *gin.Context) {
+	var req ebpf.QuarantineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quarantine request: " + err.Error()})
+		return
+	}
+	actor := c.GetString("username")
+	eng := ebpf.GetEngine()
+	rec := eng.Forensics.QuarantineContainer(req, actor, eng.IDS)
+	c.JSON(http.StatusOK, rec)
+}
+
+func ebpfQuarantineReleaseWebHandler(c *gin.Context) {
+	id := c.Param("id")
+	actor := c.GetString("username")
+	eng := ebpf.GetEngine()
+	rec, ok := eng.Forensics.ReleaseQuarantine(id, actor)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Quarantine record not found"})
+		return
+	}
+	c.JSON(http.StatusOK, rec)
+}
+
+func ebpfPCAPListWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	caps := eng.Forensics.GetPCAPCaptures()
+	if caps == nil {
+		caps = []ebpf.PCAPCapture{}
+	}
+	c.JSON(http.StatusOK, caps)
+}
+
+func ebpfPCAPCaptureWebHandler(c *gin.Context) {
+	var req ebpf.PCAPCaptureRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid PCAP request: " + err.Error()})
+		return
+	}
+	actor := c.GetString("username")
+	eng := ebpf.GetEngine()
+	capRec := eng.Forensics.CapturePCAP(req, eng.Probe, actor)
+	c.JSON(http.StatusOK, capRec)
+}
+
+func ebpfPCAPDownloadWebHandler(c *gin.Context) {
+	id := c.Param("id")
+	eng := ebpf.GetEngine()
+	data, meta, ok := eng.Forensics.GetPCAPData(id)
+	if !ok || meta == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "PCAP capture not found"})
+		return
+	}
+	filename := fmt.Sprintf("gubernator-%s.pcap", meta.ID)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.Data(http.StatusOK, "application/vnd.tcpdump.pcap", data)
+}
+
+func ebpfPurpleTeamScenariosWebHandler(c *gin.Context) {
+	eng := ebpf.GetEngine()
+	c.JSON(http.StatusOK, gin.H{
+		"scenarios": eng.Forensics.GetPurpleTeamScenarios(),
+		"runs":      eng.Forensics.GetPurpleTeamRuns(),
+	})
+}
+
+func ebpfPurpleTeamRunWebHandler(c *gin.Context) {
+	var req ebpf.PurpleTeamRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid purple team request: " + err.Error()})
+		return
+	}
+	actor := c.GetString("username")
+	eng := ebpf.GetEngine()
+	run, err := eng.Forensics.RunPurpleTeamScenario(req, eng.Probe, eng.IDS, actor)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, run)
 }
 
 func ebpfStreamWebHandler(c *gin.Context) {

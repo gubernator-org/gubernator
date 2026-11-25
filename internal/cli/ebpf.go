@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -303,6 +304,124 @@ func formatBytes(b uint64) string {
 	return fmt.Sprintf("%d B", b)
 }
 
+var (
+	quarantineNode   string
+	quarantineReason string
+	purpleNode       string
+	purpleContainer  string
+)
+
+var ebpfAlertsCmd = &cobra.Command{
+	Use:   "alerts",
+	Short: "List live eBPF Runtime IDS security alerts",
+	Run: func(cmd *cobra.Command, args []string) {
+		resp, err := DoAPIRequest("GET", "/v1/ebpf/alerts?limit=50", nil)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to connect to Manager: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var alerts []ebpf.SecurityAlert
+		_ = json.NewDecoder(resp.Body).Decode(&alerts)
+		if len(alerts) == 0 {
+			fmt.Println("No runtime IDS alerts recorded.")
+			return
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		_, _ = fmt.Fprintln(w, "ID\tSEVERITY\tMITRE\tNODE\tCONTAINER\tSTATUS\tTITLE")
+		for _, a := range alerts {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				a.ID, a.Severity, a.MitreTechnique, a.NodeHost, a.ContainerName, a.Status, a.Title)
+		}
+		_ = w.Flush()
+	},
+}
+
+var ebpfSurfaceCmd = &cobra.Command{
+	Use:   "surface",
+	Short: "Audit live listening ports & shadow services across all Centurion nodes",
+	Run: func(cmd *cobra.Command, args []string) {
+		resp, err := DoAPIRequest("GET", "/v1/ebpf/attack-surface", nil)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to connect to Manager: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var entries []ebpf.AttackSurfaceEntry
+		_ = json.NewDecoder(resp.Body).Decode(&entries)
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		_, _ = fmt.Fprintln(w, "NODE\tPROTO\tBIND:PORT\tPROCESS\tSHADOW\tRISK\tREASON")
+		for _, e := range entries {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s:%d\t%s\t%v\t%s\t%s\n",
+				e.NodeHost, e.Protocol, e.BindAddress, e.Port, e.ProcessName, e.IsShadow, e.RiskLevel, e.RiskReason)
+		}
+		_ = w.Flush()
+	},
+}
+
+var ebpfQuarantineCmd = &cobra.Command{
+	Use:   "quarantine <container>",
+	Short: "Isolate a compromised container's network while preserving RAM/processes for DFIR",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		body, _ := json.Marshal(ebpf.QuarantineRequest{
+			ContainerName: args[0],
+			NodeHost:      quarantineNode,
+			Reason:        quarantineReason,
+		})
+		resp, err := DoAPIRequest("POST", "/v1/ebpf/quarantine", bytes.NewReader(body))
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to connect to Manager: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var rec ebpf.QuarantineRecord
+		_ = json.NewDecoder(resp.Body).Decode(&rec)
+		fmt.Printf("Quarantined %s (id=%s, method=%s, node=%s)\n  %s\n", rec.ContainerName, rec.ID, rec.Method, rec.NodeHost, rec.Details)
+	},
+}
+
+var ebpfPurpleTeamCmd = &cobra.Command{
+	Use:   "purple-team [scenario-id]",
+	Short: "List or execute controlled MITRE ATT&CK Purple Team validation playbooks",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 0 {
+			resp, err := DoAPIRequest("GET", "/v1/ebpf/purple-team/scenarios", nil)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to connect to Manager: %v\n", err)
+				os.Exit(1)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			var payload struct {
+				Scenarios []ebpf.PurpleTeamScenario `json:"scenarios"`
+			}
+			_ = json.NewDecoder(resp.Body).Decode(&payload)
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			_, _ = fmt.Fprintln(w, "SCENARIO ID\tMITRE\tSEVERITY\tNAME")
+			for _, sc := range payload.Scenarios {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sc.ID, sc.MitreTechnique, sc.Severity, sc.Name)
+			}
+			_ = w.Flush()
+			return
+		}
+		body, _ := json.Marshal(ebpf.PurpleTeamRunRequest{
+			ScenarioID:      args[0],
+			TargetNode:      purpleNode,
+			TargetContainer: purpleContainer,
+		})
+		resp, err := DoAPIRequest("POST", "/v1/ebpf/purple-team/run", bytes.NewReader(body))
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to connect to Manager: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var run ebpf.PurpleTeamRun
+		_ = json.NewDecoder(resp.Body).Decode(&run)
+		fmt.Printf("Purple Team Run %s (%s / %s): detected=%v mttd=%.2fms score=%d/100\n",
+			run.ID, run.ScenarioName, run.MitreTechnique, run.Detected, run.MTTDMs, run.Score)
+	},
+}
+
 func init() {
 	ebpfFlowsCmd.Flags().IntVarP(&flowLimit, "limit", "n", 25, "Maximum number of flows to show")
 	ebpfFlowsCmd.Flags().StringVarP(&flowProto, "protocol", "p", "", "Filter by protocol (HTTP, gRPC, DNS, TCP, REDIS, POSTGRES)")
@@ -314,9 +433,18 @@ func init() {
 	ebpfSimulateCmd.Flags().IntVar(&simDuration, "duration", 10, "Duration in seconds")
 	ebpfSimulateCmd.Flags().Float64Var(&simErrors, "errors", 0, "Error injection percentage (0-100)")
 
+	ebpfQuarantineCmd.Flags().StringVar(&quarantineNode, "node", "manager", "Target Centurion node")
+	ebpfQuarantineCmd.Flags().StringVar(&quarantineReason, "reason", "CLI forensic quarantine", "Reason for isolation")
+	ebpfPurpleTeamCmd.Flags().StringVar(&purpleNode, "node", "manager", "Target Centurion node")
+	ebpfPurpleTeamCmd.Flags().StringVar(&purpleContainer, "container", "gbnt-caddy", "Target container")
+
 	ebpfCmd.AddCommand(ebpfStatusCmd)
 	ebpfCmd.AddCommand(ebpfFlowsCmd)
 	ebpfCmd.AddCommand(ebpfTopologyCmd)
 	ebpfCmd.AddCommand(ebpfSimulateCmd)
+	ebpfCmd.AddCommand(ebpfAlertsCmd)
+	ebpfCmd.AddCommand(ebpfSurfaceCmd)
+	ebpfCmd.AddCommand(ebpfQuarantineCmd)
+	ebpfCmd.AddCommand(ebpfPurpleTeamCmd)
 	rootCmd.AddCommand(ebpfCmd)
 }

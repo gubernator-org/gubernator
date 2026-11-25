@@ -627,6 +627,21 @@ class _AppShellState extends State<AppShell> {
               ),
               SidebarSubItem(
                 subIndex: 2,
+                icon: Icons.gpp_maybe_outlined,
+                label: 'Threat IDS & Alerts',
+              ),
+              SidebarSubItem(
+                subIndex: 3,
+                icon: Icons.radar,
+                label: 'Attack Surface & Zero-Trust',
+              ),
+              SidebarSubItem(
+                subIndex: 4,
+                icon: Icons.science_outlined,
+                label: 'Purple Team & Forensics',
+              ),
+              SidebarSubItem(
+                subIndex: 5,
                 icon: Icons.memory_outlined,
                 label: 'Kernel Probes & Diagnostics',
               ),

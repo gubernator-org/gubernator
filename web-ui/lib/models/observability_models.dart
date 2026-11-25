@@ -543,10 +543,73 @@ class EbpfInterfaceStats {
   }
 }
 
+class EbpfNodeTelemetry {
+  final String nodeId;
+  final String nodeIp;
+  final String role;
+  final String kernelVersion;
+  final bool ebpfSupported;
+  final int activeSockets;
+  final int listeningPorts;
+  final int tcpRetransmits;
+  final int synDrops;
+  final int packetDrops;
+  final double dnsLatencyMs;
+  final double storageIoLatMs;
+  final int openFds;
+  final int maxFds;
+  final String status;
+  final String error;
+  final DateTime lastCollected;
+
+  EbpfNodeTelemetry({
+    required this.nodeId,
+    required this.nodeIp,
+    this.role = 'worker',
+    this.kernelVersion = '',
+    this.ebpfSupported = false,
+    this.activeSockets = 0,
+    this.listeningPorts = 0,
+    this.tcpRetransmits = 0,
+    this.synDrops = 0,
+    this.packetDrops = 0,
+    this.dnsLatencyMs = 0.0,
+    this.storageIoLatMs = 0.0,
+    this.openFds = 0,
+    this.maxFds = 0,
+    this.status = 'online',
+    this.error = '',
+    required this.lastCollected,
+  });
+
+  factory EbpfNodeTelemetry.fromJson(Map<String, dynamic> json) {
+    return EbpfNodeTelemetry(
+      nodeId: json['node_id'] ?? '',
+      nodeIp: json['node_ip'] ?? '',
+      role: json['role'] ?? 'worker',
+      kernelVersion: json['kernel_version'] ?? '',
+      ebpfSupported: json['ebpf_supported'] == true,
+      activeSockets: (json['active_sockets'] as num?)?.toInt() ?? 0,
+      listeningPorts: (json['listening_ports'] as num?)?.toInt() ?? 0,
+      tcpRetransmits: (json['tcp_retransmits'] as num?)?.toInt() ?? 0,
+      synDrops: (json['syn_drops'] as num?)?.toInt() ?? 0,
+      packetDrops: (json['packet_drops'] as num?)?.toInt() ?? 0,
+      dnsLatencyMs: (json['dns_latency_ms'] as num?)?.toDouble() ?? 0.0,
+      storageIoLatMs: (json['storage_io_lat_ms'] as num?)?.toDouble() ?? 0.0,
+      openFds: (json['open_fds'] as num?)?.toInt() ?? 0,
+      maxFds: (json['max_fds'] as num?)?.toInt() ?? 0,
+      status: json['status'] ?? 'online',
+      error: json['error'] ?? '',
+      lastCollected: DateTime.tryParse(json['last_collected']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
 class EbpfStats {
   final String kernelVersion;
   final bool ebpfSupported;
   final String mode;
+  final bool syntheticPulse;
   final int activeProbes;
   final List<String> probesList;
   final int totalFlows;
@@ -554,7 +617,15 @@ class EbpfStats {
   final double packetsPerSec;
   final double bytesPerSec;
   final int droppedPackets;
+  final int nodesMonitored;
+  final int activeAlerts;
+  final int criticalAlerts;
+  final int quarantinedCount;
+  final bool baselineLocked;
+  final int baselineEdges;
+  final int attackSurfaceRisk;
   final List<EbpfInterfaceStats> interfaces;
+  final List<EbpfNodeTelemetry> nodeSnapshots;
   final Map<String, int> protocolCounts;
   final Map<String, int> statusCounts;
 
@@ -562,6 +633,7 @@ class EbpfStats {
     required this.kernelVersion,
     required this.ebpfSupported,
     this.mode = 'kernel',
+    this.syntheticPulse = false,
     this.activeProbes = 0,
     this.probesList = const [],
     this.totalFlows = 0,
@@ -569,7 +641,15 @@ class EbpfStats {
     this.packetsPerSec = 0.0,
     this.bytesPerSec = 0.0,
     this.droppedPackets = 0,
+    this.nodesMonitored = 0,
+    this.activeAlerts = 0,
+    this.criticalAlerts = 0,
+    this.quarantinedCount = 0,
+    this.baselineLocked = false,
+    this.baselineEdges = 0,
+    this.attackSurfaceRisk = 0,
     this.interfaces = const [],
+    this.nodeSnapshots = const [],
     this.protocolCounts = const {},
     this.statusCounts = const {},
   });
@@ -580,6 +660,15 @@ class EbpfStats {
       for (final item in json['interfaces']) {
         if (item is Map<String, dynamic>) {
           ifacesList.add(EbpfInterfaceStats.fromJson(item));
+        }
+      }
+    }
+
+    final nodesList = <EbpfNodeTelemetry>[];
+    if (json['node_snapshots'] != null && json['node_snapshots'] is List) {
+      for (final item in json['node_snapshots']) {
+        if (item is Map<String, dynamic>) {
+          nodesList.add(EbpfNodeTelemetry.fromJson(item));
         }
       }
     }
@@ -609,6 +698,7 @@ class EbpfStats {
       kernelVersion: json['kernel_version'] ?? '',
       ebpfSupported: json['ebpf_supported'] == true,
       mode: json['mode'] ?? 'kernel',
+      syntheticPulse: json['synthetic_pulse'] == true,
       activeProbes: (json['active_probes'] as num?)?.toInt() ?? 0,
       probesList: probes,
       totalFlows: (json['total_flows'] as num?)?.toInt() ?? 0,
@@ -616,7 +706,15 @@ class EbpfStats {
       packetsPerSec: (json['packets_per_sec'] as num?)?.toDouble() ?? 0.0,
       bytesPerSec: (json['bytes_per_sec'] as num?)?.toDouble() ?? 0.0,
       droppedPackets: (json['dropped_packets'] as num?)?.toInt() ?? 0,
+      nodesMonitored: (json['nodes_monitored'] as num?)?.toInt() ?? 0,
+      activeAlerts: (json['active_alerts'] as num?)?.toInt() ?? 0,
+      criticalAlerts: (json['critical_alerts'] as num?)?.toInt() ?? 0,
+      quarantinedCount: (json['quarantined_count'] as num?)?.toInt() ?? 0,
+      baselineLocked: json['baseline_locked'] == true,
+      baselineEdges: (json['baseline_edges'] as num?)?.toInt() ?? 0,
+      attackSurfaceRisk: (json['attack_surface_risk'] as num?)?.toInt() ?? 0,
       interfaces: ifacesList,
+      nodeSnapshots: nodesList,
       protocolCounts: protoCounts,
       statusCounts: statCounts,
     );
@@ -645,6 +743,13 @@ class EbpfFlow {
   final int drops;
   final String traceId;
   final String status;
+  final String nodeHost;
+  final String processName;
+  final int pid;
+  final int uid;
+  final bool synthetic;
+  final List<String> anomalyTags;
+  final String mitreTechnique;
   final DateTime timestamp;
 
   EbpfFlow({
@@ -669,6 +774,13 @@ class EbpfFlow {
     this.drops = 0,
     this.traceId = '',
     required this.status,
+    this.nodeHost = '',
+    this.processName = '',
+    this.pid = 0,
+    this.uid = 0,
+    this.synthetic = false,
+    this.anomalyTags = const [],
+    this.mitreTechnique = '',
     required this.timestamp,
   });
 
@@ -700,6 +812,13 @@ class EbpfFlow {
       drops: (json['drops'] as num?)?.toInt() ?? 0,
       traceId: json['trace_id'] ?? '',
       status: json['status'] ?? 'healthy',
+      nodeHost: json['node_host'] ?? '',
+      processName: json['process_name'] ?? '',
+      pid: (json['pid'] as num?)?.toInt() ?? 0,
+      uid: (json['uid'] as num?)?.toInt() ?? 0,
+      synthetic: json['synthetic'] == true,
+      anomalyTags: (json['anomaly_tags'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      mitreTechnique: json['mitre_technique'] ?? '',
       timestamp: ts,
     );
   }
@@ -713,6 +832,8 @@ class EbpfTopologyNode {
   final String nodeHost;
   final String ip;
   final String status;
+  final bool quarantined;
+  final int alertCount;
   final double inboundBps;
   final double outboundBps;
   final int activeFlows;
@@ -728,6 +849,8 @@ class EbpfTopologyNode {
     this.nodeHost = '',
     this.ip = '',
     this.status = 'running',
+    this.quarantined = false,
+    this.alertCount = 0,
     this.inboundBps = 0.0,
     this.outboundBps = 0.0,
     this.activeFlows = 0,
@@ -745,6 +868,8 @@ class EbpfTopologyNode {
       nodeHost: json['node_host'] ?? '',
       ip: json['ip'] ?? '',
       status: json['status'] ?? 'running',
+      quarantined: json['quarantined'] == true,
+      alertCount: (json['alert_count'] as num?)?.toInt() ?? 0,
       inboundBps: (json['inbound_bps'] as num?)?.toDouble() ?? 0.0,
       outboundBps: (json['outbound_bps'] as num?)?.toDouble() ?? 0.0,
       activeFlows: (json['active_flows'] as num?)?.toInt() ?? 0,
@@ -765,6 +890,7 @@ class EbpfTopologyEdge {
   final int activeFlows;
   final double errorRate;
   final String traceId;
+  final bool drift;
   final String status;
   final DateTime lastSeen;
 
@@ -778,6 +904,7 @@ class EbpfTopologyEdge {
     this.activeFlows = 0,
     this.errorRate = 0.0,
     this.traceId = '',
+    this.drift = false,
     this.status = 'healthy',
     required this.lastSeen,
   });
@@ -797,6 +924,7 @@ class EbpfTopologyEdge {
       activeFlows: (json['active_flows'] as num?)?.toInt() ?? 0,
       errorRate: (json['error_rate'] as num?)?.toDouble() ?? 0.0,
       traceId: json['trace_id'] ?? '',
+      drift: json['drift'] == true,
       status: json['status'] ?? 'healthy',
       lastSeen: ls,
     );
@@ -842,6 +970,484 @@ class EbpfTopology {
       nodes: nList,
       edges: eList,
       updatedAt: u,
+    );
+  }
+}
+
+class EbpfSecurityAlert {
+  final String id;
+  final DateTime timestamp;
+  final String severity;
+  final String category;
+  final String title;
+  final String description;
+  final String nodeHost;
+  final String containerName;
+  final String sourceIp;
+  final String destIp;
+  final int destPort;
+  final String processName;
+  final int pid;
+  final int uid;
+  final String commandLine;
+  final String mitreTactic;
+  final String mitreTechnique;
+  final List<String> complianceRefs;
+  final String status;
+  final bool simulated;
+  final bool siemLogged;
+  final double detectionMs;
+  final Map<String, String> evidence;
+
+  EbpfSecurityAlert({
+    required this.id,
+    required this.timestamp,
+    required this.severity,
+    required this.category,
+    required this.title,
+    required this.description,
+    this.nodeHost = '',
+    this.containerName = '',
+    this.sourceIp = '',
+    this.destIp = '',
+    this.destPort = 0,
+    this.processName = '',
+    this.pid = 0,
+    this.uid = 0,
+    this.commandLine = '',
+    this.mitreTactic = '',
+    this.mitreTechnique = '',
+    this.complianceRefs = const [],
+    this.status = 'open',
+    this.simulated = false,
+    this.siemLogged = false,
+    this.detectionMs = 0.0,
+    this.evidence = const {},
+  });
+
+  factory EbpfSecurityAlert.fromJson(Map<String, dynamic> json) {
+    final ev = <String, String>{};
+    if (json['evidence'] is Map) {
+      (json['evidence'] as Map).forEach((k, v) => ev[k.toString()] = v?.toString() ?? '');
+    }
+    return EbpfSecurityAlert(
+      id: json['id'] ?? '',
+      timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      severity: json['severity'] ?? 'medium',
+      category: json['category'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      nodeHost: json['node_host'] ?? '',
+      containerName: json['container_name'] ?? '',
+      sourceIp: json['source_ip'] ?? '',
+      destIp: json['dest_ip'] ?? '',
+      destPort: (json['dest_port'] as num?)?.toInt() ?? 0,
+      processName: json['process_name'] ?? '',
+      pid: (json['pid'] as num?)?.toInt() ?? 0,
+      uid: (json['uid'] as num?)?.toInt() ?? 0,
+      commandLine: json['command_line'] ?? '',
+      mitreTactic: json['mitre_tactic'] ?? '',
+      mitreTechnique: json['mitre_technique'] ?? '',
+      complianceRefs: (json['compliance_refs'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      status: json['status'] ?? 'open',
+      simulated: json['simulated'] == true,
+      siemLogged: json['siem_logged'] == true,
+      detectionMs: (json['detection_ms'] as num?)?.toDouble() ?? 0.0,
+      evidence: ev,
+    );
+  }
+}
+
+class EbpfAttackSurfaceEntry {
+  final String id;
+  final String nodeHost;
+  final String nodeIp;
+  final String protocol;
+  final String bindAddress;
+  final int port;
+  final String processName;
+  final int pid;
+  final String containerName;
+  final String exposure;
+  final bool declaredInCompose;
+  final bool isShadow;
+  final bool isRawSocket;
+  final String riskLevel;
+  final String riskReason;
+
+  EbpfAttackSurfaceEntry({
+    required this.id,
+    required this.nodeHost,
+    required this.nodeIp,
+    required this.protocol,
+    required this.bindAddress,
+    required this.port,
+    required this.processName,
+    this.pid = 0,
+    this.containerName = '',
+    this.exposure = 'cluster_lan',
+    this.declaredInCompose = false,
+    this.isShadow = false,
+    this.isRawSocket = false,
+    this.riskLevel = 'low',
+    this.riskReason = '',
+  });
+
+  factory EbpfAttackSurfaceEntry.fromJson(Map<String, dynamic> json) {
+    return EbpfAttackSurfaceEntry(
+      id: json['id'] ?? '',
+      nodeHost: json['node_host'] ?? '',
+      nodeIp: json['node_ip'] ?? '',
+      protocol: json['protocol'] ?? 'TCP',
+      bindAddress: json['bind_address'] ?? '',
+      port: (json['port'] as num?)?.toInt() ?? 0,
+      processName: json['process_name'] ?? '',
+      pid: (json['pid'] as num?)?.toInt() ?? 0,
+      containerName: json['container_name'] ?? '',
+      exposure: json['exposure'] ?? 'cluster_lan',
+      declaredInCompose: json['declared_in_compose'] == true,
+      isShadow: json['is_shadow'] == true,
+      isRawSocket: json['is_raw_socket'] == true,
+      riskLevel: json['risk_level'] ?? 'low',
+      riskReason: json['risk_reason'] ?? '',
+    );
+  }
+}
+
+class EbpfZeroTrustRule {
+  final String key;
+  final String sourceName;
+  final String destName;
+  final int destPort;
+  final String protocol;
+  final int observedCount;
+  final bool allowed;
+  final bool isDrift;
+
+  EbpfZeroTrustRule({
+    required this.key,
+    required this.sourceName,
+    required this.destName,
+    required this.destPort,
+    required this.protocol,
+    this.observedCount = 0,
+    this.allowed = true,
+    this.isDrift = false,
+  });
+
+  factory EbpfZeroTrustRule.fromJson(Map<String, dynamic> json) {
+    return EbpfZeroTrustRule(
+      key: json['key'] ?? '',
+      sourceName: json['source_name'] ?? '',
+      destName: json['dest_name'] ?? '',
+      destPort: (json['dest_port'] as num?)?.toInt() ?? 0,
+      protocol: json['protocol'] ?? 'TCP',
+      observedCount: (json['observed_count'] as num?)?.toInt() ?? 0,
+      allowed: json['allowed'] == true,
+      isDrift: json['is_drift'] == true,
+    );
+  }
+}
+
+class EbpfZeroTrustBaseline {
+  final bool locked;
+  final int totalRules;
+  final int driftCount;
+  final List<EbpfZeroTrustRule> rules;
+  final String nftablesPolicy;
+  final String iptablesPolicy;
+
+  EbpfZeroTrustBaseline({
+    this.locked = false,
+    this.totalRules = 0,
+    this.driftCount = 0,
+    this.rules = const [],
+    this.nftablesPolicy = '',
+    this.iptablesPolicy = '',
+  });
+
+  factory EbpfZeroTrustBaseline.fromJson(Map<String, dynamic> json) {
+    final list = <EbpfZeroTrustRule>[];
+    if (json['rules'] is List) {
+      for (final item in json['rules']) {
+        if (item is Map<String, dynamic>) {
+          list.add(EbpfZeroTrustRule.fromJson(item));
+        }
+      }
+    }
+    return EbpfZeroTrustBaseline(
+      locked: json['locked'] == true,
+      totalRules: (json['total_rules'] as num?)?.toInt() ?? 0,
+      driftCount: (json['drift_count'] as num?)?.toInt() ?? 0,
+      rules: list,
+      nftablesPolicy: json['nftables_policy'] ?? '',
+      iptablesPolicy: json['iptables_policy'] ?? '',
+    );
+  }
+}
+
+class EbpfProcessSocket {
+  final String nodeHost;
+  final String nodeIp;
+  final String containerName;
+  final int pid;
+  final int uid;
+  final String processName;
+  final String commandLine;
+  final String protocol;
+  final String state;
+  final String localAddr;
+  final String remoteAddr;
+  final bool suspicious;
+  final String suspicionNote;
+  final DateTime observedAt;
+
+  EbpfProcessSocket({
+    required this.nodeHost,
+    this.nodeIp = '',
+    this.containerName = '',
+    this.pid = 0,
+    this.uid = 0,
+    required this.processName,
+    this.commandLine = '',
+    this.protocol = 'TCP',
+    this.state = '',
+    this.localAddr = '',
+    this.remoteAddr = '',
+    this.suspicious = false,
+    this.suspicionNote = '',
+    required this.observedAt,
+  });
+
+  factory EbpfProcessSocket.fromJson(Map<String, dynamic> json) {
+    return EbpfProcessSocket(
+      nodeHost: json['node_host'] ?? '',
+      nodeIp: json['node_ip'] ?? '',
+      containerName: json['container_name'] ?? '',
+      pid: (json['pid'] as num?)?.toInt() ?? 0,
+      uid: (json['uid'] as num?)?.toInt() ?? 0,
+      processName: json['process_name'] ?? '',
+      commandLine: json['command_line'] ?? '',
+      protocol: json['protocol'] ?? 'TCP',
+      state: json['state'] ?? '',
+      localAddr: json['local_addr'] ?? '',
+      remoteAddr: json['remote_addr'] ?? '',
+      suspicious: json['suspicious'] == true,
+      suspicionNote: json['suspicion_note'] ?? '',
+      observedAt: DateTime.tryParse(json['observed_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
+class EbpfQuarantineRecord {
+  final String id;
+  final String containerName;
+  final String containerIp;
+  final String nodeHost;
+  final String nodeIp;
+  final String reason;
+  final String alertId;
+  final DateTime quarantinedAt;
+  final String quarantinedBy;
+  final String status;
+  final String method;
+  final bool preservedForensics;
+  final String details;
+
+  EbpfQuarantineRecord({
+    required this.id,
+    required this.containerName,
+    this.containerIp = '',
+    required this.nodeHost,
+    this.nodeIp = '',
+    this.reason = '',
+    this.alertId = '',
+    required this.quarantinedAt,
+    this.quarantinedBy = '',
+    this.status = 'active',
+    this.method = 'simulated',
+    this.preservedForensics = true,
+    this.details = '',
+  });
+
+  factory EbpfQuarantineRecord.fromJson(Map<String, dynamic> json) {
+    return EbpfQuarantineRecord(
+      id: json['id'] ?? '',
+      containerName: json['container_name'] ?? '',
+      containerIp: json['container_ip'] ?? '',
+      nodeHost: json['node_host'] ?? '',
+      nodeIp: json['node_ip'] ?? '',
+      reason: json['reason'] ?? '',
+      alertId: json['alert_id'] ?? '',
+      quarantinedAt: DateTime.tryParse(json['quarantined_at']?.toString() ?? '') ?? DateTime.now(),
+      quarantinedBy: json['quarantined_by'] ?? '',
+      status: json['status'] ?? 'active',
+      method: json['method'] ?? 'simulated',
+      preservedForensics: json['preserved_forensics'] != false,
+      details: json['details'] ?? '',
+    );
+  }
+}
+
+class EbpfPcapCapture {
+  final String id;
+  final String nodeHost;
+  final String containerName;
+  final String filter;
+  final int durationS;
+  final String source;
+  final int packetCount;
+  final int sizeBytes;
+  final String status;
+  final List<String> summaryLines;
+  final DateTime createdAt;
+
+  EbpfPcapCapture({
+    required this.id,
+    required this.nodeHost,
+    this.containerName = '',
+    this.filter = '',
+    this.durationS = 5,
+    this.source = '',
+    this.packetCount = 0,
+    this.sizeBytes = 0,
+    this.status = 'completed',
+    this.summaryLines = const [],
+    required this.createdAt,
+  });
+
+  factory EbpfPcapCapture.fromJson(Map<String, dynamic> json) {
+    return EbpfPcapCapture(
+      id: json['id'] ?? '',
+      nodeHost: json['node_host'] ?? '',
+      containerName: json['container_name'] ?? '',
+      filter: json['filter'] ?? '',
+      durationS: (json['duration_s'] as num?)?.toInt() ?? 5,
+      source: json['source'] ?? '',
+      packetCount: (json['packet_count'] as num?)?.toInt() ?? 0,
+      sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
+      status: json['status'] ?? 'completed',
+      summaryLines: (json['summary_lines'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
+class EbpfPurpleTeamScenario {
+  final String id;
+  final String name;
+  final String category;
+  final String mitreTactic;
+  final String mitreTechnique;
+  final String severity;
+  final String description;
+  final List<String> complianceRefs;
+
+  EbpfPurpleTeamScenario({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.mitreTactic,
+    required this.mitreTechnique,
+    required this.severity,
+    required this.description,
+    this.complianceRefs = const [],
+  });
+
+  factory EbpfPurpleTeamScenario.fromJson(Map<String, dynamic> json) {
+    return EbpfPurpleTeamScenario(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      category: json['category'] ?? '',
+      mitreTactic: json['mitre_tactic'] ?? '',
+      mitreTechnique: json['mitre_technique'] ?? '',
+      severity: json['severity'] ?? 'high',
+      description: json['description'] ?? '',
+      complianceRefs: (json['compliance_refs'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+    );
+  }
+}
+
+class EbpfPurpleTeamStep {
+  final String name;
+  final String status;
+  final String detail;
+  final double durationMs;
+
+  EbpfPurpleTeamStep({
+    required this.name,
+    required this.status,
+    required this.detail,
+    this.durationMs = 0.0,
+  });
+
+  factory EbpfPurpleTeamStep.fromJson(Map<String, dynamic> json) {
+    return EbpfPurpleTeamStep(
+      name: json['name'] ?? '',
+      status: json['status'] ?? '',
+      detail: json['detail'] ?? '',
+      durationMs: (json['duration_ms'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class EbpfPurpleTeamRun {
+  final String id;
+  final String scenarioId;
+  final String scenarioName;
+  final String mitreTactic;
+  final String mitreTechnique;
+  final String targetNode;
+  final String targetContainer;
+  final DateTime startedAt;
+  final bool detected;
+  final double mttdMs;
+  final int alertsTriggered;
+  final bool siemLogged;
+  final int score;
+  final List<EbpfPurpleTeamStep> steps;
+
+  EbpfPurpleTeamRun({
+    required this.id,
+    required this.scenarioId,
+    required this.scenarioName,
+    required this.mitreTactic,
+    required this.mitreTechnique,
+    this.targetNode = '',
+    this.targetContainer = '',
+    required this.startedAt,
+    this.detected = false,
+    this.mttdMs = 0.0,
+    this.alertsTriggered = 0,
+    this.siemLogged = false,
+    this.score = 0,
+    this.steps = const [],
+  });
+
+  factory EbpfPurpleTeamRun.fromJson(Map<String, dynamic> json) {
+    final sList = <EbpfPurpleTeamStep>[];
+    if (json['steps'] is List) {
+      for (final item in json['steps']) {
+        if (item is Map<String, dynamic>) {
+          sList.add(EbpfPurpleTeamStep.fromJson(item));
+        }
+      }
+    }
+    return EbpfPurpleTeamRun(
+      id: json['id'] ?? '',
+      scenarioId: json['scenario_id'] ?? '',
+      scenarioName: json['scenario_name'] ?? '',
+      mitreTactic: json['mitre_tactic'] ?? '',
+      mitreTechnique: json['mitre_technique'] ?? '',
+      targetNode: json['target_node'] ?? '',
+      targetContainer: json['target_container'] ?? '',
+      startedAt: DateTime.tryParse(json['started_at']?.toString() ?? '') ?? DateTime.now(),
+      detected: json['detected'] == true,
+      mttdMs: (json['mttd_ms'] as num?)?.toDouble() ?? 0.0,
+      alertsTriggered: (json['alerts_triggered'] as num?)?.toInt() ?? 0,
+      siemLogged: json['siem_logged'] == true,
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      steps: sList,
     );
   }
 }

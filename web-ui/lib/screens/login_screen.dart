@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _usernameFocus = FocusNode();
@@ -25,6 +27,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _oidcLoading = false;
   String? _errorMessage;
   String? _timeoutNotice;
+  StreamSubscription<html.Event>? _domInputSub;
+  StreamSubscription<html.Event>? _domChangeSub;
+  Timer? _autofillSyncTimer;
+  int _autofillPollTicks = 0;
 
   // MFA Challenge State (ENS op.acc.2 & op.acc.6)
   bool _mfaRequired = false;
@@ -54,16 +60,106 @@ class _LoginScreenState extends State<LoginScreen> {
     ApiService.sendTimeBeacon();
     _loadProviders();
     _checkOIDCCallback();
+    _attachBrowserAutofillSync();
   }
 
   @override
   void dispose() {
+    _autofillSyncTimer?.cancel();
+    _domInputSub?.cancel();
+    _domChangeSub?.cancel();
     _usernameController.dispose();
     _passwordController.dispose();
     _usernameFocus.dispose();
     _passwordFocus.dispose();
     _mfaCodeController.dispose();
     super.dispose();
+  }
+
+  // ── Browser Password Manager / Autofill DOM Sync (Flutter Web) ──────────
+  void _attachBrowserAutofillSync() {
+    try {
+      _domInputSub = html.document.onInput.listen((_) => _syncDomAutofillInputs());
+      _domChangeSub = html.document.onChange.listen((_) => _syncDomAutofillInputs());
+      // Poll briefly after mount to catch delayed browser/extension autofills
+      // (Chrome, Safari Keychain, Firefox, Bitwarden, 1Password) that mutate
+      // hidden DOM <input>.value without dispatching synthetic Flutter events.
+      _autofillSyncTimer = Timer.periodic(const Duration(milliseconds: 350), (t) {
+        _autofillPollTicks++;
+        if (!mounted || _mfaRequired || _autofillPollTicks > 20) {
+          t.cancel();
+          return;
+        }
+        _syncDomAutofillInputs();
+      });
+    } catch (_) {}
+  }
+
+  List<html.InputElement> _collectDomInputs() {
+    final inputs = <html.InputElement>[];
+    try {
+      for (final el in html.document.querySelectorAll('input')) {
+        if (el is html.InputElement) inputs.add(el);
+      }
+      // Flutter Web (3.22+) mounts flt-text-editing-host inside flt-glass-pane's shadowRoot.
+      for (final pane in html.document.querySelectorAll('flt-glass-pane')) {
+        final sr = pane.shadowRoot;
+        if (sr != null) {
+          for (final el in sr.querySelectorAll('input')) {
+            if (el is html.InputElement) inputs.add(el);
+          }
+        }
+      }
+    } catch (_) {}
+    return inputs;
+  }
+
+  void _syncDomAutofillInputs({bool force = false}) {
+    if (!mounted || _mfaRequired) return;
+    final inputs = _collectDomInputs();
+    if (inputs.isEmpty) return;
+
+    String? domUser;
+    String? domPass;
+
+    for (final input in inputs) {
+      final val = input.value ?? '';
+      if (val.isEmpty) continue;
+      final ac = (input.getAttribute('autocomplete') ?? '').toLowerCase();
+      final type = (input.type ?? '').toLowerCase();
+      final name = (input.name ?? '').toLowerCase();
+
+      if (type == 'password' || ac.contains('password') || name.contains('password')) {
+        domPass = val;
+      } else if (ac.contains('username') ||
+          ac.contains('email') ||
+          type == 'email' ||
+          name.contains('user')) {
+        domUser = val;
+      }
+    }
+
+    if (domUser != null &&
+        domUser.isNotEmpty &&
+        (force || (_usernameController.text.isEmpty && !_usernameFocus.hasFocus))) {
+      if (_usernameController.text != domUser) {
+        _usernameController.value = TextEditingValue(
+          text: domUser,
+          selection: TextSelection.collapsed(offset: domUser.length),
+        );
+      }
+    }
+
+    if (domPass != null &&
+        domPass.isNotEmpty &&
+        (force || (_passwordController.text.isEmpty && !_passwordFocus.hasFocus))) {
+      if (_passwordController.text != domPass) {
+        _passwordController.value = TextEditingValue(
+          text: domPass,
+          selection: TextSelection.collapsed(offset: domPass.length),
+        );
+      }
+    }
   }
 
   // ── Check if we're returning from an OIDC callback ──────────────────────
@@ -126,6 +222,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // ── Standard form login ──────────────────────────────────────────────────
   Future<void> _handleLogin() async {
+    // Sync any values silently autofilled by browser password manager / extensions
+    _syncDomAutofillInputs(force: true);
+
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -153,6 +252,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (res['success'] == true) {
+      // Signal browser password manager to save/update the authenticated credentials
+      TextInput.finishAutofillContext(shouldSave: true);
+
       if (res['mfa_required'] == true) {
         setState(() {
           _loading = false;
@@ -430,32 +532,38 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (_mfaRequired)
                     _buildMFAView(context, isDark)
                   else ...[
-                    // ── OIDC SSO Buttons ─────────────────────────────────
-                    if (hasOIDC || _loadingProviders) ...[
-                      const SizedBox(height: 28),
-                      _buildSectionLabel(context, 'Single Sign-On', Icons.vpn_key_outlined, const Color(0xFF8B5CF6)),
-                      const SizedBox(height: 10),
-                      if (_loadingProviders)
-                        const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-                      else
-                        ...(_oidcProviders.map((p) {
-                          final meta = _oidcProviderMeta(p.providerType, p.name);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _OIDCSSOButton(
-                              icon: meta.icon,
-                              color: meta.color,
-                              label: 'Continue with ${meta.label}',
-                              loading: _oidcLoading,
-                              onPressed: () => _handleOIDCLogin(p),
-                            ),
-                          );
-                        })),
-                      const SizedBox(height: 20),
-                      _buildDivider(context, isDark),
-                      const SizedBox(height: 20),
-                    ] else
-                      const SizedBox(height: 28),
+                    // ── OIDC SSO Buttons (kept in a single stable slot so AutofillGroup never unmounts) ──
+                    Column(
+                      key: const ValueKey('oidc-section-slot'),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: (hasOIDC || _loadingProviders)
+                          ? [
+                              const SizedBox(height: 28),
+                              _buildSectionLabel(context, 'Single Sign-On', Icons.vpn_key_outlined, const Color(0xFF8B5CF6)),
+                              const SizedBox(height: 10),
+                              if (_loadingProviders)
+                                const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+                              else
+                                ...(_oidcProviders.map((p) {
+                                  final meta = _oidcProviderMeta(p.providerType, p.name);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: _OIDCSSOButton(
+                                      icon: meta.icon,
+                                      color: meta.color,
+                                      label: 'Continue with ${meta.label}',
+                                      loading: _oidcLoading,
+                                      onPressed: () => _handleOIDCLogin(p),
+                                    ),
+                                  );
+                                })),
+                              const SizedBox(height: 20),
+                              _buildDivider(context, isDark),
+                              const SizedBox(height: 20),
+                            ]
+                          : const [SizedBox(height: 28)],
+                    ),
 
                     // ── Form-based login (Local / LDAP) ───────────────────
                     _buildSectionLabel(context, 'Directory Authentication', Icons.corporate_fare, const Color(0xFF38BDF8)),
@@ -511,119 +619,118 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    AutofillGroup(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Username
-                          Text(
-                            'Username / sAMAccountName',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _usernameController,
-                            focusNode: _usernameFocus,
-                            autofillHints: const [AutofillHints.username],
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              hintText: _selectedProvider == 'local' ? 'Enter username' : 'user@company.local',
-                              prefixIcon: const Icon(Icons.person_outline, size: 20),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
+                    Form(
+                      key: _formKey,
+                      child: AutofillGroup(
+                        key: const ValueKey('login-autofill-group'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Username
+                            Text(
+                              'Username / sAMAccountName',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
-                            onSubmitted: (_) => _passwordFocus.requestFocus(),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Password
-                          Text(
-                            'Password',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Stack(
-                            alignment: Alignment.centerRight,
-                            children: [
-                              TextField(
-                                controller: _passwordController,
-                                focusNode: _passwordFocus,
-                                autofillHints: const [AutofillHints.password],
-                                textInputAction: TextInputAction.done,
-                                obscureText: _obscurePassword,
-                                decoration: InputDecoration(
-                                  hintText: 'Enter password',
-                                  prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                                  filled: true,
-                                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(color: primaryColor, width: 1.5),
-                                  ),
-                                  contentPadding: const EdgeInsets.only(left: 14, right: 48, top: 12, bottom: 12),
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const ValueKey('login-username-field'),
+                              controller: _usernameController,
+                              focusNode: _usernameFocus,
+                              autofocus: true,
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              autofillHints: const [AutofillHints.username, AutofillHints.email],
+                              textInputAction: TextInputAction.next,
+                              decoration: InputDecoration(
+                                hintText: _selectedProvider == 'local' ? 'Enter username' : 'user@company.local',
+                                prefixIcon: const Icon(Icons.person_outline, size: 20),
+                                filled: true,
+                                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
                                 ),
-                                onSubmitted: (_) => _handleLogin(),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                               ),
-                              Positioned(
-                                right: 4,
-                                child: Tooltip(
+                              onChanged: (_) => _syncDomAutofillInputs(),
+                              onSubmitted: (_) => _passwordFocus.requestFocus(),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Password
+                            Text(
+                              'Password',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const ValueKey('login-password-field'),
+                              controller: _passwordController,
+                              focusNode: _passwordFocus,
+                              keyboardType: TextInputType.visiblePassword,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              autofillHints: const [AutofillHints.password],
+                              textInputAction: TextInputAction.done,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                hintText: 'Enter password',
+                                prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                                suffixIcon: Tooltip(
                                   message: _obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(20),
-                                      mouseCursor: SystemMouseCursors.click,
-                                      onTap: () {
-                                        setState(() {
-                                          _obscurePassword = !_obscurePassword;
-                                        });
-                                        final len = _passwordController.text.length;
-                                        _passwordController.selection = TextSelection.fromPosition(
-                                          TextPosition(offset: len),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Icon(
-                                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                          size: 20,
-                                          color: _obscurePassword
-                                              ? (isDark ? Colors.grey[400] : Colors.grey[600])
-                                              : const Color(0xFFF97316),
-                                        ),
-                                      ),
+                                  child: IconButton(
+                                    onPressed: () {
+                                      _syncDomAutofillInputs(force: true);
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                      final len = _passwordController.text.length;
+                                      _passwordController.selection = TextSelection.fromPosition(
+                                        TextPosition(offset: len),
+                                      );
+                                    },
+                                    icon: Icon(
+                                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      size: 20,
+                                      color: _obscurePassword
+                                          ? (isDark ? Colors.grey[400] : Colors.grey[600])
+                                          : const Color(0xFFF97316),
                                     ),
                                   ),
                                 ),
+                                filled: true,
+                                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.25)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.5),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                               ),
-                            ],
-                          ),
-                        ],
+                              onSubmitted: (_) => _handleLogin(),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),

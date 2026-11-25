@@ -4,8 +4,14 @@ part of '../ebpf_page.dart';
 
 class _FlowDetailsDialog extends StatelessWidget {
   final EbpfFlow flow;
+  final VoidCallback? onQuarantine;
+  final VoidCallback? onCapturePcap;
 
-  const _FlowDetailsDialog({required this.flow});
+  const _FlowDetailsDialog({
+    required this.flow,
+    this.onQuarantine,
+    this.onCapturePcap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -20,18 +26,24 @@ class _FlowDetailsDialog extends StatelessWidget {
         ],
       ),
       content: SizedBox(
-        width: 540,
+        width: 560,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildRow('Flow ID', flow.id, theme, copyable: true),
               _buildRow('Timestamp', flow.timestamp.toIso8601String(), theme),
+              if (flow.nodeHost.isNotEmpty) _buildRow('Centurion Node', flow.nodeHost, theme),
+              if (flow.processName.isNotEmpty || flow.pid > 0)
+                _buildRow('Process / PID', '${flow.processName} (PID ${flow.pid}, UID ${flow.uid})', theme),
+              _buildRow('Telemetry Source', flow.synthetic ? 'Simulated / Demo Pulse' : 'Real Kernel Telemetry', theme),
               _buildRow('Protocol', flow.protocol, theme),
               _buildRow('Status', '${flow.status.toUpperCase()} (${flow.statusCode})', theme),
               _buildRow('Source Endpoint', '${flow.sourceName} (${flow.sourceIp}:${flow.sourcePort})', theme),
               _buildRow('Destination Endpoint', '${flow.destName} (${flow.destIp}:${flow.destPort})', theme),
               if (flow.path.isNotEmpty) _buildRow('Path / Method', '${flow.method} ${flow.path}', theme),
+              if (flow.mitreTechnique.isNotEmpty) _buildRow('MITRE ATT&CK', flow.mitreTechnique, theme),
+              if (flow.anomalyTags.isNotEmpty) _buildRow('IDS Anomalies', flow.anomalyTags.join(', '), theme),
               if (flow.traceId.isNotEmpty) _buildRow('Jaeger Trace ID', flow.traceId, theme, copyable: true),
               _buildRow('Latency (RTT)', '${flow.latencyMs.toStringAsFixed(2)} ms', theme),
               _buildRow('Bytes Sent / Recv', '${flow.bytesSent} B / ${flow.bytesReceived} B', theme),
@@ -42,6 +54,23 @@ class _FlowDetailsDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        if (onQuarantine != null)
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
+              foregroundColor: Colors.redAccent,
+              side: const BorderSide(color: Colors.redAccent),
+            ),
+            onPressed: onQuarantine,
+            icon: const Icon(Icons.block, size: 14),
+            label: const Text('Quarantine Source', style: TextStyle(fontSize: 11)),
+          ),
+        if (onCapturePcap != null)
+          OutlinedButton.icon(
+            onPressed: onCapturePcap,
+            icon: const Icon(Icons.network_check, size: 14),
+            label: const Text('Capture PCAP', style: TextStyle(fontSize: 11)),
+          ),
         if (flow.traceId.isNotEmpty)
           FilledButton.icon(
             style: FilledButton.styleFrom(

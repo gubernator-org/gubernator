@@ -30,34 +30,78 @@ type ContainerEndpoint struct {
 
 // Probe manages socket inspection, container network discovery, and flow capture.
 type Probe struct {
-	mu           sync.RWMutex
-	kernelVer    string
-	ebpfEnabled  bool
-	mode         string // "kernel", "emulation", or "fallback"
-	activeProbes int
-	probesList   []string
-	endpoints    map[string]*ContainerEndpoint // IP -> endpoint
-	recentFlows  []Flow
-	maxFlows     int
-	totalFlows   int64
-	droppedPkts  int64
-	interfaces   []InterfaceStats
-	subscribers  map[chan Flow]struct{}
-	subMu        sync.Mutex
-	stopCh       chan struct{}
+	mu             sync.RWMutex
+	kernelVer      string
+	ebpfEnabled    bool
+	mode           string // "kernel", "emulation", or "fallback"
+	syntheticPulse bool
+	activeProbes   int
+	probesList     []string
+	endpoints      map[string]*ContainerEndpoint // Name -> endpoint
+	ipToEndpoint   map[string]*ContainerEndpoint // IP -> endpoint
+	recentFlows    []Flow
+	maxFlows       int
+	totalFlows     int64
+	droppedPkts    int64
+	interfaces     []InterfaceStats
+	subscribers    map[chan Flow]struct{}
+	subMu          sync.Mutex
+	stopCh         chan struct{}
+	ids            *SecurityIDS
+	forensics      *ForensicsManager
+	collector      *MultiNodeCollector
 }
 
 // NewProbe creates and initializes an eBPF network probe.
 func NewProbe() *Probe {
 	p := &Probe{
-		maxFlows:    1000,
-		recentFlows: make([]Flow, 0, 1000),
-		endpoints:   make(map[string]*ContainerEndpoint),
-		subscribers: make(map[chan Flow]struct{}),
-		stopCh:      make(chan struct{}),
+		maxFlows:       1000,
+		recentFlows:    make([]Flow, 0, 1000),
+		endpoints:      make(map[string]*ContainerEndpoint),
+		ipToEndpoint:   make(map[string]*ContainerEndpoint),
+		subscribers:    make(map[chan Flow]struct{}),
+		stopCh:         make(chan struct{}),
+		syntheticPulse: runtime.GOOS != "linux", // real-first on Linux, demo pulse on Darwin dev
 	}
 	p.detectKernelEBPF()
 	return p
+}
+
+// SetSubsystems attaches the Runtime IDS, Forensics, and Multi-Node Collector to the Probe.
+func (p *Probe) SetSubsystems(ids *SecurityIDS, forensics *ForensicsManager, collector *MultiNodeCollector) {
+	p.mu.Lock()
+	p.ids = ids
+	p.forensics = forensics
+	p.collector = collector
+	p.mu.Unlock()
+}
+
+// SetSyntheticPulse toggles synthetic demo traffic generation.
+func (p *Probe) SetSyntheticPulse(enabled bool) {
+	p.mu.Lock()
+	p.syntheticPulse = enabled
+	p.mu.Unlock()
+}
+
+// IsSyntheticPulse returns whether background synthetic traffic pulse is enabled.
+func (p *Probe) IsSyntheticPulse() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.syntheticPulse
+}
+
+// LookupByIP resolves an IP address to its discovered ContainerEndpoint.
+func (p *Probe) LookupByIP(ip string) *ContainerEndpoint {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.ipToEndpoint[strings.TrimSpace(ip)]
+}
+
+// LookupByName resolves a container name to its discovered ContainerEndpoint.
+func (p *Probe) LookupByName(name string) *ContainerEndpoint {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.endpoints[strings.TrimSpace(name)]
 }
 
 // detectKernelEBPF inspects system capabilities for eBPF support.
@@ -127,16 +171,27 @@ func (p *Probe) Unsubscribe(ch chan Flow) {
 	close(ch)
 }
 
-// EmitFlow publishes a flow to the in-memory ring buffer and all active subscribers.
+// EmitFlow publishes a flow to the in-memory ring buffer, runs Runtime IDS analysis,
+// and broadcasts to all active subscribers.
 func (p *Probe) EmitFlow(f Flow) {
-	p.mu.Lock()
 	if f.ID == "" {
 		f.ID = uuid.New().String()
 	}
 	if f.Timestamp.IsZero() {
 		f.Timestamp = time.Now()
 	}
+	if f.NodeHost == "" {
+		f.NodeHost = "manager"
+	}
 
+	p.mu.RLock()
+	ids := p.ids
+	p.mu.RUnlock()
+	if ids != nil {
+		ids.AnalyzeFlow(&f)
+	}
+
+	p.mu.Lock()
 	p.totalFlows++
 	if len(p.recentFlows) >= p.maxFlows {
 		p.recentFlows = p.recentFlows[1:]
@@ -303,8 +358,20 @@ func (p *Probe) RefreshEndpoints() {
 		}
 	}
 
+	// Build reverse IP -> endpoint lookup index for real kernel socket correlation
+	newIPIndex := make(map[string]*ContainerEndpoint)
+	for _, ep := range newEndpoints {
+		for _, ip := range ep.IPs {
+			ip = strings.TrimSpace(ip)
+			if ip != "" {
+				newIPIndex[ip] = ep
+			}
+		}
+	}
+
 	p.mu.Lock()
 	p.endpoints = newEndpoints
+	p.ipToEndpoint = newIPIndex
 	p.mu.Unlock()
 }
 
@@ -346,8 +413,13 @@ func (p *Probe) generateBaselineFlows() {
 
 // GetRecentFlows returns the last N captured flows.
 func (p *Probe) GetRecentFlows(limit int, protocolFilter string, statusFilter string, query string) []Flow {
+	return p.GetRecentFlowsFiltered(limit, protocolFilter, statusFilter, query, "", false)
+}
+
+// GetRecentFlowsFiltered returns the last N captured flows with optional node and real-only filters.
+func (p *Probe) GetRecentFlowsFiltered(limit int, protocolFilter string, statusFilter string, query string, nodeFilter string, realOnly bool) []Flow {
 	p.mu.RLock()
-	needBaseline := len(p.recentFlows) == 0
+	needBaseline := len(p.recentFlows) == 0 && p.syntheticPulse
 	p.mu.RUnlock()
 
 	if needBaseline {
@@ -363,18 +435,27 @@ func (p *Probe) GetRecentFlows(limit int, protocolFilter string, statusFilter st
 	for i := len(p.recentFlows) - 1; i >= 0; i-- {
 		f := p.recentFlows[i]
 
+		if realOnly && f.Synthetic {
+			continue
+		}
+		if nodeFilter != "" && nodeFilter != "ALL" && !strings.EqualFold(f.NodeHost, nodeFilter) {
+			continue
+		}
 		if protocolFilter != "" && protocolFilter != "ALL" && !strings.EqualFold(f.Protocol, protocolFilter) {
 			continue
 		}
 		if statusFilter != "" && statusFilter != "ALL" {
 			if statusFilter == "ERRORS" && f.Status != FlowStatusError {
 				continue
-			} else if !strings.EqualFold(string(f.Status), statusFilter) && statusFilter != "ERRORS" {
+			} else if statusFilter == "ANOMALIES" && len(f.AnomalyTags) == 0 {
+				continue
+			} else if !strings.EqualFold(string(f.Status), statusFilter) && statusFilter != "ERRORS" && statusFilter != "ANOMALIES" {
 				continue
 			}
 		}
 		if queryLower != "" {
-			combined := strings.ToLower(fmt.Sprintf("%s %s %s %s %s", f.SourceName, f.DestName, f.Path, f.Protocol, f.Method))
+			combined := strings.ToLower(fmt.Sprintf("%s %s %s %s %s %s %s %s %s",
+				f.SourceName, f.DestName, f.SourceIP, f.DestIP, f.Path, f.Protocol, f.Method, f.ProcessName, f.NodeHost))
 			if !strings.Contains(combined, queryLower) {
 				continue
 			}
@@ -524,17 +605,34 @@ func (p *Probe) BuildTopology() NetworkTopology {
 		}
 	}
 
-	// Flatten into arrays
+	// Flatten into arrays and enrich with Runtime IDS alerts, Zero-Trust drift, and Quarantine status
+	ids := p.ids
+	forensics := p.forensics
+	var alertsByContainer map[string]int
+	if ids != nil {
+		_, _, alertsByContainer = ids.CountAlerts()
+	}
+
 	nodes := make([]TopologyNode, 0, len(nodesMap))
 	for _, n := range nodesMap {
 		if n.ActiveFlows > 0 {
 			n.ErrorRate = (n.ErrorRate / float64(n.ActiveFlows)) * 100.0
+		}
+		if alertsByContainer != nil {
+			n.AlertCount = alertsByContainer[n.Name]
+		}
+		if forensics != nil && forensics.IsContainerQuarantined(n.Name) {
+			n.Quarantined = true
+			n.Status = "quarantined"
 		}
 		nodes = append(nodes, *n)
 	}
 
 	edges := make([]TopologyEdge, 0, len(edgesMap))
 	for _, e := range edgesMap {
+		if ids != nil && ids.IsEdgeDrift(e.SourceID, e.TargetID, e.Protocol) {
+			e.Drift = true
+		}
 		edges = append(edges, *e)
 	}
 
@@ -548,12 +646,15 @@ func (p *Probe) BuildTopology() NetworkTopology {
 // GetStats returns global aggregate telemetry metrics.
 func (p *Probe) GetStats() NetworkStats {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	ids := p.ids
+	forensics := p.forensics
+	collector := p.collector
 
 	stats := NetworkStats{
 		KernelVersion:  p.kernelVer,
 		EBPFSupported:  p.ebpfEnabled,
 		Mode:           p.mode,
+		SyntheticPulse: p.syntheticPulse,
 		ActiveProbes:   p.activeProbes,
 		ProbesList:     append([]string{}, p.probesList...),
 		TotalFlows:     p.totalFlows,
@@ -583,11 +684,37 @@ func (p *Probe) GetStats() NetworkStats {
 			}
 		}
 	}
+	p.mu.RUnlock()
 
 	stats.ActiveFlows = activeCount
 	if activeCount > 0 {
 		stats.BytesPerSec = float64(recentBytes) / 30.0
 		stats.PacketsPerSec = float64(activeCount) * 8.5
+	}
+
+	if ids != nil {
+		openAlerts, critAlerts, _ := ids.CountAlerts()
+		stats.ActiveAlerts = openAlerts
+		stats.CriticalAlerts = critAlerts
+		zt := ids.GetZeroTrustBaseline()
+		stats.BaselineLocked = zt.Locked
+		stats.BaselineEdges = zt.TotalRules
+	}
+	if forensics != nil {
+		stats.QuarantinedCount = forensics.ActiveQuarantineCount()
+	}
+	if collector != nil {
+		snaps := collector.GetNodeSnapshots()
+		stats.NodeSnapshots = snaps
+		stats.NodesMonitored = len(snaps)
+		stats.AttackSurfaceRisk = collector.CountHighRiskSurface()
+		var totalDrops int64
+		for _, s := range snaps {
+			totalDrops += s.PacketDrops
+		}
+		if totalDrops > stats.DroppedPackets {
+			stats.DroppedPackets = totalDrops
+		}
 	}
 
 	return stats
@@ -720,21 +847,43 @@ func parseHexSocket(s string) (string, int) {
 }
 
 func (p *Probe) correlateSocketEvent(srcIP string, srcPort int, dstIP string, dstPort int, proto string) {
+	p.CorrelateRealSocket("manager", srcIP, srcPort, dstIP, dstPort, proto, "", 0)
+}
+
+// CorrelateRealSocket maps a real kernel socket from any Centurion node to container endpoints
+// using the IP reverse index and emits it into the live eBPF + IDS pipeline.
+func (p *Probe) CorrelateRealSocket(nodeHost, srcIP string, srcPort int, dstIP string, dstPort int, proto string, procName string, pid int) {
 	p.mu.RLock()
-	srcEp := p.endpoints[srcIP]
-	dstEp := p.endpoints[dstIP]
+	srcEp := p.ipToEndpoint[srcIP]
+	dstEp := p.ipToEndpoint[dstIP]
 	p.mu.RUnlock()
 
 	srcName := srcIP
 	if srcEp != nil {
 		srcName = srcEp.Name
+	} else if procName != "" {
+		srcName = procName
 	}
 	dstName := dstIP
 	if dstEp != nil {
 		dstName = dstEp.Name
 	}
 
-	// Emit flow
+	// Infer L7 protocol from well-known destination port
+	effProto := proto
+	switch dstPort {
+	case 53:
+		effProto = "DNS"
+	case 80, 443, 3000, 3100, 4000, 4001, 8080, 9090:
+		effProto = "HTTP"
+	case 4317:
+		effProto = "gRPC"
+	case 5432:
+		effProto = "POSTGRES"
+	case 6379:
+		effProto = "REDIS"
+	}
+
 	p.EmitFlow(Flow{
 		SourceID:      srcName,
 		SourceName:    srcName,
@@ -744,10 +893,14 @@ func (p *Probe) correlateSocketEvent(srcIP string, srcPort int, dstIP string, ds
 		DestName:      dstName,
 		DestIP:        dstIP,
 		DestPort:      dstPort,
-		Protocol:      proto,
-		LatencyMs:     float64(5 + rand.Intn(15)),
-		ThroughputBps: float64(1024 * (10 + rand.Intn(150))),
+		Protocol:      effProto,
+		LatencyMs:     float64(2 + rand.Intn(10)),
+		ThroughputBps: float64(1024 * (10 + rand.Intn(120))),
 		Status:        FlowStatusHealthy,
+		NodeHost:      fallbackStr(nodeHost, "manager"),
+		ProcessName:   procName,
+		PID:           pid,
+		Synthetic:     false,
 		Timestamp:     time.Now(),
 	})
 }

@@ -56,12 +56,45 @@ extension _EbpfTabsExt on _EbpfPageState {
                   DropdownMenuItem(value: 'warning', child: Text('Warning 🟡', style: TextStyle(fontSize: 12))),
                   DropdownMenuItem(value: 'error', child: Text('Errors 🔴', style: TextStyle(fontSize: 12))),
                   DropdownMenuItem(value: 'ERRORS', child: Text('Any Issues ⚠️', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 'ANOMALIES', child: Text('IDS Anomalies 🛡️', style: TextStyle(fontSize: 12))),
                 ],
                 onChanged: (val) {
                   if (val != null) {
                     _updateState(() => _selectedStatus = val);
                     _fetchFlowsAndStatsSilently();
                   }
+                },
+              ),
+
+              const SizedBox(width: 12),
+
+              // Centurion Node Dropdown
+              DropdownButton<String>(
+                value: _availableNodes.contains(_selectedNode) ? _selectedNode : 'ALL',
+                underline: const SizedBox(),
+                isDense: true,
+                items: _availableNodes
+                    .map((n) => DropdownMenuItem(
+                          value: n,
+                          child: Text(n == 'ALL' ? 'All Nodes' : n, style: const TextStyle(fontSize: 12)),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    _updateState(() => _selectedNode = val);
+                    _fetchFlowsAndStatsSilently();
+                  }
+                },
+              ),
+
+              const SizedBox(width: 10),
+
+              FilterChip(
+                selected: _realOnlyFlows,
+                label: const Text('Real Only', style: TextStyle(fontSize: 11)),
+                onSelected: (v) {
+                  _updateState(() => _realOnlyFlows = v);
+                  _fetchFlowsAndStatsSilently();
                 },
               ),
 
@@ -224,10 +257,19 @@ extension _EbpfTabsExt on _EbpfPageState {
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          "${flow.sourceIp}:${flow.sourcePort}",
+                          "${flow.sourceIp}:${flow.sourcePort}${flow.nodeHost.isNotEmpty ? ' • ${flow.nodeHost}' : ''}${flow.pid > 0 ? ' (pid ${flow.pid})' : ''}",
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
+                        if (flow.anomalyTags.isNotEmpty || flow.mitreTechnique.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              '⚠️ ${flow.mitreTechnique.isNotEmpty ? "[${flow.mitreTechnique}] " : ""}${flow.anomalyTags.join(", ")}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -884,6 +926,60 @@ extension _EbpfTabsExt on _EbpfPageState {
                   ),
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Multi-Node Centurion Deep Network & I/O Diagnostics
+          if (_nodes.isNotEmpty) ...[
+            Row(
+              children: [
+                Text(
+                  'Multi-Node Centurion Kernel, TCP, CoreDNS & Storage I/O Diagnostics',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _scanningSurface ? null : _triggerSurfaceScan,
+                  icon: const Icon(Icons.radar, size: 15),
+                  label: const Text('Probe All Centurions', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('CENTURION')),
+                    DataColumn(label: Text('KERNEL / eBPF')),
+                    DataColumn(label: Text('SOCKETS / LISTEN')),
+                    DataColumn(label: Text('TCP RETRANS')),
+                    DataColumn(label: Text('SYN / PKT DROPS')),
+                    DataColumn(label: Text('COREDNS RTT')),
+                    DataColumn(label: Text('/var/contenedores I/O')),
+                    DataColumn(label: Text('OPEN FDs')),
+                  ],
+                  rows: _nodes.map((n) {
+                    return DataRow(cells: [
+                      DataCell(Text('${n.nodeId} (${n.role})\n${n.nodeIp}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold))),
+                      DataCell(Text('${n.kernelVersion}\n${n.ebpfSupported ? "eBPF READY" : "FALLBACK"}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
+                      DataCell(Text('${n.activeSockets} est / ${n.listeningPorts} listen', style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
+                      DataCell(Text('${n.tcpRetransmits}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+                      DataCell(Text('${n.synDrops} / ${n.packetDrops}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+                      DataCell(Text('${n.dnsLatencyMs.toStringAsFixed(2)} ms', style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+                      DataCell(Text(n.storageIoLatMs > 0 ? '${n.storageIoLatMs.toStringAsFixed(2)} ms' : 'N/A', style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+                      DataCell(Text(n.maxFds > 0 ? '${n.openFds} / ${n.maxFds}' : '${n.openFds}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
+                    ]);
+                  }).toList(),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
           ],

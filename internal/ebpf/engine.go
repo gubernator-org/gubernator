@@ -11,9 +11,13 @@ import (
 	"time"
 )
 
-// Engine coordinates the eBPF probing subsystem and manages background collection.
+// Engine coordinates the eBPF probing subsystem, Runtime IDS, Multi-Node Collector,
+// and Forensic / Purple Team response suite.
 type Engine struct {
 	Probe         *Probe
+	IDS           *SecurityIDS
+	Collector     *MultiNodeCollector
+	Forensics     *ForensicsManager
 	running       bool
 	stopCh        chan struct{}
 	mu            sync.Mutex
@@ -30,16 +34,28 @@ var (
 func GetEngine() *Engine {
 	engineOnce.Do(func() {
 		probe := NewProbe()
+		ids := NewSecurityIDS()
+		collector := NewMultiNodeCollector()
+		forensics := NewForensicsManager()
+		probe.SetSubsystems(ids, forensics, collector)
 		globalEngine = &Engine{
-			Probe:  probe,
-			stopCh: make(chan struct{}),
+			Probe:     probe,
+			IDS:       ids,
+			Collector: collector,
+			Forensics: forensics,
+			stopCh:    make(chan struct{}),
 		}
 		globalEngine.Start()
 	})
 	return globalEngine
 }
 
-// Start initiates the background probe and topology refresher loop.
+// TriggerMultiNodeScan triggers an immediate multi-node telemetry & attack-surface scan asynchronously.
+func (e *Engine) TriggerMultiNodeScan() {
+	go e.Collector.CollectAll(e.Probe, e.IDS)
+}
+
+// Start initiates the background probe, multi-node collector, and topology refresher loop.
 func (e *Engine) Start() {
 	e.mu.Lock()
 	if e.running {
@@ -50,11 +66,14 @@ func (e *Engine) Start() {
 	e.stopCh = make(chan struct{})
 	e.mu.Unlock()
 
-	// Initial endpoint refresh
+	// Initial endpoint refresh & asynchronous multi-node kernel/attack-surface scan
 	e.Probe.RefreshEndpoints()
+	go e.Collector.CollectAll(e.Probe, e.IDS)
 
-	// Populate initial baseline flows for active visual animation
-	e.generateBaselineFlows()
+	// Populate initial baseline flows only when synthetic pulse is active
+	if e.Probe.IsSyntheticPulse() {
+		e.generateBaselineFlows()
+	}
 
 	go e.runLoop()
 }
@@ -70,12 +89,14 @@ func (e *Engine) Stop() {
 	close(e.stopCh)
 }
 
-// runLoop executes the periodic endpoint discovery, socket polling, and active flow heartbeats.
+// runLoop executes the periodic endpoint discovery, socket polling, multi-node telemetry, and optional pulse.
 func (e *Engine) runLoop() {
 	ticker := time.NewTicker(3 * time.Second)
 	flowTicker := time.NewTicker(1200 * time.Millisecond)
+	multiNodeTicker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	defer flowTicker.Stop()
+	defer multiNodeTicker.Stop()
 
 	for {
 		select {
@@ -85,10 +106,20 @@ func (e *Engine) runLoop() {
 			e.Probe.RefreshEndpoints()
 			e.Probe.InspectLinuxSockets()
 			e.Probe.InspectLinuxInterfaces()
+		case <-multiNodeTicker.C:
+			go e.Collector.CollectAll(e.Probe, e.IDS)
 		case <-flowTicker.C:
-			e.generateActivePulse()
+			if e.Probe.IsSyntheticPulse() || e.isSimulating() {
+				e.generateActivePulse()
+			}
 		}
 	}
+}
+
+func (e *Engine) isSimulating() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.simulating && time.Now().Before(e.simulateUntil)
 }
 
 // generateActivePulse generates realistic inter-service flows based on discovered endpoints.
@@ -184,6 +215,9 @@ func (e *Engine) generateActivePulse() {
 			ThroughputBps: bps,
 			TraceID:       traceID,
 			Status:        status,
+			NodeHost:      fallbackStr(src.NodeHost, "manager"),
+			ProcessName:   src.Name,
+			Synthetic:     true,
 			Timestamp:     time.Now(),
 		}
 		e.Probe.EmitFlow(f)

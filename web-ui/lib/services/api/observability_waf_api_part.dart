@@ -513,6 +513,8 @@ class ObservabilityWafApi {
     String? protocol,
     String? status,
     String? query,
+    String? node,
+    bool realOnly = false,
   }) async {
     final params = <String, String>{'limit': limit.toString()};
     if (protocol != null && protocol.isNotEmpty && protocol != 'ALL') {
@@ -523,6 +525,12 @@ class ObservabilityWafApi {
     }
     if (query != null && query.isNotEmpty) {
       params['q'] = query;
+    }
+    if (node != null && node.isNotEmpty && node != 'ALL') {
+      params['node'] = node;
+    }
+    if (realOnly) {
+      params['real_only'] = 'true';
     }
     final uri = Uri.parse('/api/ebpf/flows').replace(queryParameters: params);
     final response = await http.get(uri, headers: authHeaders);
@@ -563,5 +571,282 @@ class ObservabilityWafApi {
       }),
     );
     return response.statusCode == 200;
+  }
+
+  /// Toggles synthetic demo pulse vs real-only kernel telemetry.
+  static Future<bool> setEbpfTelemetryMode({
+    required bool syntheticPulse,
+    bool triggerScan = false,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/ebpf/mode'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'synthetic_pulse': syntheticPulse,
+        'trigger_scan': triggerScan,
+      }),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Fetches per-Centurion kernel & deep network diagnostics.
+  static Future<List<EbpfNodeTelemetry>> fetchEbpfNodes() async {
+    final response = await http.get(Uri.parse('/api/ebpf/nodes'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => EbpfNodeTelemetry.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Fetches Runtime IDS security alerts detected via eBPF.
+  static Future<List<EbpfSecurityAlert>> fetchEbpfAlerts({
+    String? severity,
+    String? category,
+    String? status,
+    int limit = 100,
+  }) async {
+    final params = <String, String>{'limit': limit.toString()};
+    if (severity != null && severity != 'ALL' && severity.isNotEmpty) params['severity'] = severity;
+    if (category != null && category != 'ALL' && category.isNotEmpty) params['category'] = category;
+    if (status != null && status != 'ALL' && status.isNotEmpty) params['status'] = status;
+    final uri = Uri.parse('/api/ebpf/alerts').replace(queryParameters: params);
+    final response = await http.get(uri, headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => EbpfSecurityAlert.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Acknowledges or mitigates an eBPF security alert.
+  static Future<bool> acknowledgeEbpfAlert(String id, {String status = 'acknowledged'}) async {
+    final response = await http.post(
+      Uri.parse('/api/ebpf/alerts/$id/ack'),
+      headers: authHeaders,
+      body: jsonEncode({'status': status}),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Clears simulated or all eBPF security alerts.
+  static Future<bool> clearEbpfAlerts({bool simulatedOnly = true}) async {
+    final uri = Uri.parse('/api/ebpf/alerts').replace(
+      queryParameters: {'simulated_only': simulatedOnly ? 'true' : 'false'},
+    );
+    final response = await http.delete(uri, headers: authHeaders);
+    return response.statusCode == 200;
+  }
+
+  /// Fetches cluster-wide listening ports & shadow port audit.
+  static Future<List<EbpfAttackSurfaceEntry>> fetchEbpfAttackSurface({
+    String? node,
+    bool shadowOnly = false,
+  }) async {
+    final params = <String, String>{};
+    if (node != null && node.isNotEmpty && node != 'ALL') params['node'] = node;
+    if (shadowOnly) params['shadow_only'] = 'true';
+    final uri = Uri.parse('/api/ebpf/attack-surface').replace(queryParameters: params);
+    final response = await http.get(uri, headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => EbpfAttackSurfaceEntry.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Triggers an immediate multi-node attack surface & process scan.
+  static Future<bool> scanEbpfAttackSurface() async {
+    final response = await http.post(Uri.parse('/api/ebpf/attack-surface/scan'), headers: authHeaders);
+    return response.statusCode == 200;
+  }
+
+  /// Fetches Zero-Trust micro-segmentation baseline & generated firewall policies.
+  static Future<EbpfZeroTrustBaseline> fetchEbpfZeroTrust() async {
+    final response = await http.get(Uri.parse('/api/ebpf/zero-trust'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      return EbpfZeroTrustBaseline.fromJson(jsonDecode(response.body));
+    }
+    return EbpfZeroTrustBaseline();
+  }
+
+  /// Locks/unlocks or re-learns the Zero-Trust communication baseline.
+  static Future<EbpfZeroTrustBaseline> setEbpfZeroTrustLock({
+    required bool locked,
+    bool resetAndLearn = false,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/ebpf/zero-trust/lock'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'locked': locked,
+        'reset_and_learn': resetAndLearn,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return EbpfZeroTrustBaseline.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to update Zero-Trust baseline');
+  }
+
+  /// Fetches forensic Process <-> Socket correlation table across Centurion nodes.
+  static Future<List<EbpfProcessSocket>> fetchEbpfProcesses({String? node, String? query}) async {
+    final params = <String, String>{};
+    if (node != null && node.isNotEmpty && node != 'ALL') params['node'] = node;
+    if (query != null && query.isNotEmpty) params['q'] = query;
+    final uri = Uri.parse('/api/ebpf/processes').replace(queryParameters: params);
+    final response = await http.get(uri, headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => EbpfProcessSocket.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Lists quarantined containers.
+  static Future<List<EbpfQuarantineRecord>> fetchEbpfQuarantines() async {
+    final response = await http.get(Uri.parse('/api/ebpf/quarantine'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => EbpfQuarantineRecord.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Isolates a container's network while preserving RAM/processes for DFIR.
+  static Future<EbpfQuarantineRecord> quarantineEbpfContainer({
+    required String containerName,
+    String nodeHost = 'manager',
+    String containerIp = '',
+    String reason = '',
+    String alertId = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/ebpf/quarantine'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'container_name': containerName,
+        'node_host': nodeHost,
+        'container_ip': containerIp,
+        'reason': reason,
+        'alert_id': alertId,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return EbpfQuarantineRecord.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Quarantine failed: ${response.body}');
+  }
+
+  /// Releases a container from forensic quarantine.
+  static Future<bool> releaseEbpfQuarantine(String id) async {
+    final response = await http.post(Uri.parse('/api/ebpf/quarantine/$id/release'), headers: authHeaders);
+    return response.statusCode == 200;
+  }
+
+  /// Lists forensic PCAP captures.
+  static Future<List<EbpfPcapCapture>> fetchEbpfPcaps() async {
+    final response = await http.get(Uri.parse('/api/ebpf/pcap'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => EbpfPcapCapture.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Triggers an on-demand forensic PCAP capture.
+  static Future<EbpfPcapCapture> captureEbpfPcap({
+    String nodeHost = 'manager',
+    String containerName = '',
+    String filter = '',
+    int durationS = 5,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/ebpf/pcap/capture'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'node_host': nodeHost,
+        'container_name': containerName,
+        'filter': filter,
+        'duration_s': durationS,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return EbpfPcapCapture.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('PCAP capture failed: ${response.body}');
+  }
+
+  /// Downloads a forensic .pcap binary file for Wireshark directly via browser blob.
+  static Future<bool> downloadEbpfPcap(String id) async {
+    final response = await http.get(Uri.parse('/api/ebpf/pcap/$id/download'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      final blob = html.Blob([response.bodyBytes], 'application/vnd.tcpdump.pcap');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', 'gubernator-$id.pcap')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      anchor.remove();
+      return true;
+    }
+    return false;
+  }
+
+  /// Lists Purple Team MITRE ATT&CK scenarios and historical scorecards.
+  static Future<({List<EbpfPurpleTeamScenario> scenarios, List<EbpfPurpleTeamRun> runs})> fetchEbpfPurpleTeam() async {
+    final response = await http.get(Uri.parse('/api/ebpf/purple-team/scenarios'), headers: authHeaders);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final scList = <EbpfPurpleTeamScenario>[];
+      final runList = <EbpfPurpleTeamRun>[];
+      if (decoded is Map) {
+        if (decoded['scenarios'] is List) {
+          for (final item in decoded['scenarios']) {
+            if (item is Map<String, dynamic>) scList.add(EbpfPurpleTeamScenario.fromJson(item));
+          }
+        }
+        if (decoded['runs'] is List) {
+          for (final item in decoded['runs']) {
+            if (item is Map<String, dynamic>) runList.add(EbpfPurpleTeamRun.fromJson(item));
+          }
+        }
+      }
+      return (scenarios: scList, runs: runList);
+    }
+    return (scenarios: <EbpfPurpleTeamScenario>[], runs: <EbpfPurpleTeamRun>[]);
+  }
+
+  /// Executes a controlled Purple Team MITRE ATT&CK scenario.
+  static Future<EbpfPurpleTeamRun> runEbpfPurpleTeam({
+    required String scenarioId,
+    String targetNode = 'manager',
+    String targetContainer = 'gbnt-caddy',
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/ebpf/purple-team/run'),
+      headers: authHeaders,
+      body: jsonEncode({
+        'scenario_id': scenarioId,
+        'target_node': targetNode,
+        'target_container': targetContainer,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return EbpfPurpleTeamRun.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Purple Team execution failed: ${response.body}');
   }
 }

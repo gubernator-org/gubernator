@@ -888,7 +888,16 @@ class ApiService {
     String? protocol,
     String? status,
     String? query,
-  }) => ObservabilityWafApi.fetchEbpfFlows(limit: limit, protocol: protocol, status: status, query: query);
+    String? node,
+    bool realOnly = false,
+  }) => ObservabilityWafApi.fetchEbpfFlows(
+        limit: limit,
+        protocol: protocol,
+        status: status,
+        query: query,
+        node: node,
+        realOnly: realOnly,
+      );
 
   /// Fetches synthesized eBPF service mesh topology graph.
   static Future<EbpfTopology> fetchEbpfTopology() => ObservabilityWafApi.fetchEbpfTopology();
@@ -900,6 +909,80 @@ class ApiService {
     int durationS = 10,
     double errorPct = 0.0,
   }) => ObservabilityWafApi.simulateEbpfTraffic(pattern: pattern, rate: rate, durationS: durationS, errorPct: errorPct);
+
+  static Future<bool> setEbpfTelemetryMode({required bool syntheticPulse, bool triggerScan = false}) =>
+      ObservabilityWafApi.setEbpfTelemetryMode(syntheticPulse: syntheticPulse, triggerScan: triggerScan);
+
+  static Future<List<EbpfNodeTelemetry>> fetchEbpfNodes() => ObservabilityWafApi.fetchEbpfNodes();
+
+  static Future<List<EbpfSecurityAlert>> fetchEbpfAlerts({String? severity, String? category, String? status, int limit = 100}) =>
+      ObservabilityWafApi.fetchEbpfAlerts(severity: severity, category: category, status: status, limit: limit);
+
+  static Future<bool> acknowledgeEbpfAlert(String id, {String status = 'acknowledged'}) =>
+      ObservabilityWafApi.acknowledgeEbpfAlert(id, status: status);
+
+  static Future<bool> clearEbpfAlerts({bool simulatedOnly = true}) =>
+      ObservabilityWafApi.clearEbpfAlerts(simulatedOnly: simulatedOnly);
+
+  static Future<List<EbpfAttackSurfaceEntry>> fetchEbpfAttackSurface({String? node, bool shadowOnly = false}) =>
+      ObservabilityWafApi.fetchEbpfAttackSurface(node: node, shadowOnly: shadowOnly);
+
+  static Future<bool> scanEbpfAttackSurface() => ObservabilityWafApi.scanEbpfAttackSurface();
+
+  static Future<EbpfZeroTrustBaseline> fetchEbpfZeroTrust() => ObservabilityWafApi.fetchEbpfZeroTrust();
+
+  static Future<EbpfZeroTrustBaseline> setEbpfZeroTrustLock({required bool locked, bool resetAndLearn = false}) =>
+      ObservabilityWafApi.setEbpfZeroTrustLock(locked: locked, resetAndLearn: resetAndLearn);
+
+  static Future<List<EbpfProcessSocket>> fetchEbpfProcesses({String? node, String? query}) =>
+      ObservabilityWafApi.fetchEbpfProcesses(node: node, query: query);
+
+  static Future<List<EbpfQuarantineRecord>> fetchEbpfQuarantines() => ObservabilityWafApi.fetchEbpfQuarantines();
+
+  static Future<EbpfQuarantineRecord> quarantineEbpfContainer({
+    required String containerName,
+    String nodeHost = 'manager',
+    String containerIp = '',
+    String reason = '',
+    String alertId = '',
+  }) => ObservabilityWafApi.quarantineEbpfContainer(
+        containerName: containerName,
+        nodeHost: nodeHost,
+        containerIp: containerIp,
+        reason: reason,
+        alertId: alertId,
+      );
+
+  static Future<bool> releaseEbpfQuarantine(String id) => ObservabilityWafApi.releaseEbpfQuarantine(id);
+
+  static Future<List<EbpfPcapCapture>> fetchEbpfPcaps() => ObservabilityWafApi.fetchEbpfPcaps();
+
+  static Future<EbpfPcapCapture> captureEbpfPcap({
+    String nodeHost = 'manager',
+    String containerName = '',
+    String filter = '',
+    int durationS = 5,
+  }) => ObservabilityWafApi.captureEbpfPcap(
+        nodeHost: nodeHost,
+        containerName: containerName,
+        filter: filter,
+        durationS: durationS,
+      );
+
+  static Future<bool> downloadEbpfPcap(String id) => ObservabilityWafApi.downloadEbpfPcap(id);
+
+  static Future<({List<EbpfPurpleTeamScenario> scenarios, List<EbpfPurpleTeamRun> runs})> fetchEbpfPurpleTeam() =>
+      ObservabilityWafApi.fetchEbpfPurpleTeam();
+
+  static Future<EbpfPurpleTeamRun> runEbpfPurpleTeam({
+    required String scenarioId,
+    String targetNode = 'manager',
+    String targetContainer = 'gbnt-caddy',
+  }) => ObservabilityWafApi.runEbpfPurpleTeam(
+        scenarioId: scenarioId,
+        targetNode: targetNode,
+        targetContainer: targetContainer,
+      );
 
   /// Fetches Spanish ENS (RD 311/2022) compliance evaluation summary.
   static Future<ENSSummaryModel?> fetchENSStatus() => ImageComplianceApi.fetchENSStatus();

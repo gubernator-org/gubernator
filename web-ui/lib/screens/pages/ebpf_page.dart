@@ -7,10 +7,12 @@ import '../../services/api_service.dart';
 import '../../widgets/ebpf_animated_mesh_canvas.dart';
 
 part 'ebpf/ebpf_tabs_part.dart';
+part 'ebpf/ebpf_security_tabs_part.dart';
 part 'ebpf/ebpf_dialogs_part.dart';
 
-/// Dedicated eBPF Live Hub Page for Kernel Network Observability,
-/// L4/L7 Flow Tracing, and Service Mesh Topology.
+/// Dedicated eBPF Live Hub Page for Multi-Node Kernel Network Observability,
+/// Runtime IDS Threat Detection, Attack Surface & Zero-Trust, Purple Team MITRE Lab,
+/// and Forensic Response (Quarantine + PCAP + Process Timeline).
 class EbpfPage extends StatefulWidget {
   final int selectedSubIndex;
 
@@ -23,20 +25,49 @@ class EbpfPage extends StatefulWidget {
 class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Telemetry & State
+  // Core Telemetry & State
   EbpfStats? _stats;
   List<EbpfFlow> _flows = [];
   EbpfTopology? _topology;
+  List<EbpfNodeTelemetry> _nodes = [];
   bool _loading = true;
 
-  // Topology View Mode: 'canvas' (2D Vector Graph with animated particles) or 'matrix' (edges table)
+  // Security IDS, Attack Surface, Zero-Trust & Forensics State
+  List<EbpfSecurityAlert> _alerts = [];
+  List<EbpfAttackSurfaceEntry> _attackSurface = [];
+  EbpfZeroTrustBaseline _zeroTrust = EbpfZeroTrustBaseline();
+  List<EbpfProcessSocket> _processes = [];
+  List<EbpfQuarantineRecord> _quarantines = [];
+  List<EbpfPcapCapture> _pcaps = [];
+  List<EbpfPurpleTeamScenario> _purpleScenarios = [];
+  List<EbpfPurpleTeamRun> _purpleRuns = [];
+
+  // View Modes & Sub-tab States
   String _topologyViewMode = 'canvas';
+  String _surfaceSubMode = 'surface'; // 'surface' or 'zerotrust'
+  String _forensicsSubMode = 'purple'; // 'purple', 'quarantine', 'pcap', 'processes'
+  String _ztPolicyFormat = 'nftables'; // 'nftables' or 'iptables'
 
   // Filters
   String _selectedProtocol = 'ALL';
   String _selectedStatus = 'ALL';
+  String _selectedNode = 'ALL';
+  bool _realOnlyFlows = false;
   final TextEditingController _searchCtrl = TextEditingController();
   int _limit = 50;
+
+  // Alerts & Surface Filters
+  String _alertSeverity = 'ALL';
+  String _alertStatus = 'ALL';
+  bool _shadowPortsOnly = false;
+  final TextEditingController _processSearchCtrl = TextEditingController();
+
+  // Purple Team & PCAP Controls
+  String _purpleTargetNode = 'manager';
+  String _purpleTargetContainer = 'gbnt-caddy';
+  bool _runningPurple = false;
+  bool _scanningSurface = false;
+  bool _capturingPcap = false;
 
   // Live Auto-Refresh
   bool _autoRefresh = true;
@@ -57,14 +88,14 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 3,
+      length: 6,
       vsync: this,
-      initialIndex: widget.selectedSubIndex.clamp(0, 2),
+      initialIndex: widget.selectedSubIndex.clamp(0, 5),
     );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging && mounted) {
         setState(() {});
-        _fetchFlowsAndStatsSilently();
+        _fetchTabDataSilently();
       }
     });
     _loadAllData();
@@ -75,7 +106,7 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
   void didUpdateWidget(EbpfPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedSubIndex != widget.selectedSubIndex) {
-      final target = widget.selectedSubIndex.clamp(0, 2);
+      final target = widget.selectedSubIndex.clamp(0, 5);
       if (_tabController.index != target) {
         _tabController.animateTo(target);
       }
@@ -87,15 +118,16 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
     _refreshTimer?.cancel();
     _tabController.dispose();
     _searchCtrl.dispose();
+    _processSearchCtrl.dispose();
     super.dispose();
   }
 
   void _startTimer() {
     _refreshTimer?.cancel();
     if (_autoRefresh) {
-      _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
         if (mounted) {
-          _fetchFlowsAndStatsSilently();
+          _fetchTabDataSilently();
         }
       });
     }
@@ -112,11 +144,39 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
     });
   }
 
+  List<String> get _availableNodes {
+    final set = <String>{'ALL'};
+    for (final n in _nodes) {
+      if (n.nodeId.isNotEmpty) set.add(n.nodeId);
+    }
+    if (set.length == 1) set.add('manager');
+    return set.toList();
+  }
+
   Future<void> _loadAllData() async {
     setState(() => _loading = true);
+    await _fetchTabDataSilently(loadAll: true);
+    if (mounted) {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _fetchFlowsAndStatsSilently() => _fetchTabDataSilently();
+
+  Future<void> _fetchTabDataSilently({bool loadAll = false}) async {
     EbpfStats? stats;
     List<EbpfFlow>? flows;
     EbpfTopology? topo;
+    List<EbpfNodeTelemetry>? nodes;
+    List<EbpfSecurityAlert>? alerts;
+    List<EbpfAttackSurfaceEntry>? surface;
+    EbpfZeroTrustBaseline? zt;
+    List<EbpfProcessSocket>? procs;
+    List<EbpfQuarantineRecord>? quars;
+    List<EbpfPcapCapture>? pcaps;
+    ({List<EbpfPurpleTeamScenario> scenarios, List<EbpfPurpleTeamRun> runs})? purple;
+
+    final idx = _tabController.index;
 
     await Future.wait([
       () async {
@@ -124,67 +184,253 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
           stats = await ApiService.fetchEbpfStats();
         } catch (_) {}
       }(),
-      () async {
-        try {
-          flows = await ApiService.fetchEbpfFlows(
-            limit: _limit,
-            protocol: _selectedProtocol,
-            status: _selectedStatus,
-            query: _searchCtrl.text.trim(),
-          );
-        } catch (_) {}
-      }(),
-      () async {
-        try {
-          topo = await ApiService.fetchEbpfTopology();
-        } catch (_) {}
-      }(),
+      if (loadAll || idx == 0)
+        () async {
+          try {
+            flows = await ApiService.fetchEbpfFlows(
+              limit: _limit,
+              protocol: _selectedProtocol,
+              status: _selectedStatus,
+              query: _searchCtrl.text.trim(),
+              node: _selectedNode,
+              realOnly: _realOnlyFlows,
+            );
+          } catch (_) {}
+        }(),
+      if (loadAll || idx == 1)
+        () async {
+          try {
+            topo = await ApiService.fetchEbpfTopology();
+          } catch (_) {}
+        }(),
+      if (loadAll || idx == 2)
+        () async {
+          try {
+            alerts = await ApiService.fetchEbpfAlerts(
+              severity: _alertSeverity,
+              status: _alertStatus,
+            );
+          } catch (_) {}
+        }(),
+      if (loadAll || idx == 3)
+        () async {
+          try {
+            surface = await ApiService.fetchEbpfAttackSurface(
+              node: _selectedNode,
+              shadowOnly: _shadowPortsOnly,
+            );
+          } catch (_) {}
+          try {
+            zt = await ApiService.fetchEbpfZeroTrust();
+          } catch (_) {}
+        }(),
+      if (loadAll || idx == 4)
+        () async {
+          try {
+            purple = await ApiService.fetchEbpfPurpleTeam();
+          } catch (_) {}
+          try {
+            quars = await ApiService.fetchEbpfQuarantines();
+          } catch (_) {}
+          try {
+            pcaps = await ApiService.fetchEbpfPcaps();
+          } catch (_) {}
+          try {
+            procs = await ApiService.fetchEbpfProcesses(
+              node: _selectedNode,
+              query: _processSearchCtrl.text.trim(),
+            );
+          } catch (_) {}
+        }(),
+      if (loadAll || idx == 5)
+        () async {
+          try {
+            nodes = await ApiService.fetchEbpfNodes();
+          } catch (_) {}
+        }(),
     ]);
 
     if (mounted) {
       setState(() {
-        if (stats != null) _stats = stats;
+        if (stats != null) {
+          _stats = stats;
+          if (stats!.nodeSnapshots.isNotEmpty) {
+            _nodes = stats!.nodeSnapshots;
+          }
+        }
         if (flows != null) _flows = flows!;
         if (topo != null) _topology = topo;
-        _loading = false;
+        if (nodes != null && nodes!.isNotEmpty) _nodes = nodes!;
+        if (alerts != null) _alerts = alerts!;
+        if (surface != null) _attackSurface = surface!;
+        if (zt != null) _zeroTrust = zt!;
+        if (procs != null) _processes = procs!;
+        if (quars != null) _quarantines = quars!;
+        if (pcaps != null) _pcaps = pcaps!;
+        if (purple != null) {
+          _purpleScenarios = purple!.scenarios;
+          _purpleRuns = purple!.runs;
+        }
       });
     }
   }
 
-  Future<void> _fetchFlowsAndStatsSilently() async {
-    EbpfStats? stats;
-    List<EbpfFlow>? flows;
-    EbpfTopology? topo;
+  Future<void> _toggleSyntheticPulse(bool enabled) async {
+    final ok = await ApiService.setEbpfTelemetryMode(
+      syntheticPulse: enabled,
+      triggerScan: !enabled,
+    );
+    if (mounted && ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enabled
+                ? 'Demo pulse enabled alongside real kernel telemetry'
+                : 'Switched to Real-Only Multi-Node Kernel Telemetry',
+          ),
+          backgroundColor: const Color(0xFF06B6D4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _fetchTabDataSilently(loadAll: true);
+    }
+  }
 
-    await Future.wait([
-      () async {
-        try {
-          stats = await ApiService.fetchEbpfStats();
-        } catch (_) {}
-      }(),
-      () async {
-        try {
-          flows = await ApiService.fetchEbpfFlows(
-            limit: _limit,
-            protocol: _selectedProtocol,
-            status: _selectedStatus,
-            query: _searchCtrl.text.trim(),
-          );
-        } catch (_) {}
-      }(),
-      () async {
-        try {
-          topo = await ApiService.fetchEbpfTopology();
-        } catch (_) {}
-      }(),
-    ]);
+  Future<void> _triggerSurfaceScan() async {
+    setState(() => _scanningSurface = true);
+    try {
+      await ApiService.scanEbpfAttackSurface();
+      await _fetchTabDataSilently(loadAll: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Multi-node Attack Surface & Process telemetry scan completed'),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _scanningSurface = false);
+    }
+  }
 
-    if (mounted) {
-      setState(() {
-        if (stats != null) _stats = stats;
-        if (flows != null) _flows = flows!;
-        if (topo != null) _topology = topo;
-      });
+  Future<void> _quarantineContainer({
+    required String containerName,
+    String nodeHost = 'manager',
+    String containerIp = '',
+    String reason = '',
+    String alertId = '',
+  }) async {
+    try {
+      final rec = await ApiService.quarantineEbpfContainer(
+        containerName: containerName,
+        nodeHost: nodeHost,
+        containerIp: containerIp,
+        reason: reason.isEmpty ? 'Forensic network isolation triggered from eBPF Live Hub' : reason,
+        alertId: alertId,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Quarantined $containerName (${rec.method}) — RAM/processes preserved for DFIR'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _fetchTabDataSilently(loadAll: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Quarantine failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _releaseQuarantine(String id, String containerName) async {
+    final ok = await ApiService.releaseEbpfQuarantine(id);
+    if (mounted && ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Restored network connectivity for $containerName'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _fetchTabDataSilently(loadAll: true);
+    }
+  }
+
+  Future<void> _capturePcap({
+    String nodeHost = 'manager',
+    String containerName = '',
+    String filter = '',
+    int durationS = 5,
+  }) async {
+    setState(() => _capturingPcap = true);
+    try {
+      final cap = await ApiService.captureEbpfPcap(
+        nodeHost: nodeHost,
+        containerName: containerName,
+        filter: filter,
+        durationS: durationS,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PCAP ${cap.id} ready (${cap.packetCount} pkts, ${_formatBytes(cap.sizeBytes)})'),
+            backgroundColor: const Color(0xFF06B6D4),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Download .pcap',
+              textColor: Colors.black,
+              onPressed: () => ApiService.downloadEbpfPcap(cap.id),
+            ),
+          ),
+        );
+        _fetchTabDataSilently(loadAll: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PCAP capture error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _capturingPcap = false);
+    }
+  }
+
+  Future<void> _runPurpleScenario(EbpfPurpleTeamScenario sc) async {
+    setState(() => _runningPurple = true);
+    try {
+      final run = await ApiService.runEbpfPurpleTeam(
+        scenarioId: sc.id,
+        targetNode: _purpleTargetNode,
+        targetContainer: _purpleTargetContainer,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Purple Team [${run.mitreTechnique}]: ${run.detected ? "DETECTED" : "MISSED"} in ${run.mttdMs.toStringAsFixed(2)}ms — Score ${run.score}/100',
+            ),
+            backgroundColor: run.detected ? const Color(0xFF10B981) : Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        await _fetchTabDataSilently(loadAll: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Purple Team error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _runningPurple = false);
     }
   }
 
@@ -202,7 +448,7 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
           if (mounted && success) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('⚡ eBPF traffic simulation started ($pattern @ $rate req/s)'),
+                content: Text('eBPF traffic simulation started ($pattern @ $rate req/s)'),
                 backgroundColor: const Color(0xFF06B6D4),
                 behavior: SnackBarBehavior.floating,
               ),
@@ -217,7 +463,26 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
   void _openFlowDetails(EbpfFlow flow) {
     showDialog(
       context: context,
-      builder: (ctx) => _FlowDetailsDialog(flow: flow),
+      builder: (ctx) => _FlowDetailsDialog(
+        flow: flow,
+        onQuarantine: () {
+          Navigator.of(ctx).pop();
+          _quarantineContainer(
+            containerName: flow.sourceName,
+            nodeHost: flow.nodeHost.isEmpty ? 'manager' : flow.nodeHost,
+            containerIp: flow.sourceIp,
+            reason: 'Isolated from live eBPF flow ${flow.sourceName} -> ${flow.destName}:${flow.destPort}',
+          );
+        },
+        onCapturePcap: () {
+          Navigator.of(ctx).pop();
+          _capturePcap(
+            nodeHost: flow.nodeHost.isEmpty ? 'manager' : flow.nodeHost,
+            containerName: flow.sourceName,
+            filter: flow.sourceIp.isNotEmpty ? 'host ${flow.sourceIp}' : '',
+          );
+        },
+      ),
     );
   }
 
@@ -230,10 +495,7 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Top Header Toolbar ─────────────────────────────────────────
           _buildHeaderToolbar(theme),
-
-          // ── Tab Views (controlled via Level-3 Sidebar Navigation) ──────
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF06B6D4)))
@@ -243,6 +505,9 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                     children: [
                       _buildFlowsTab(theme),
                       _buildTopologyTab(theme),
+                      _buildThreatIdsTab(theme),
+                      _buildAttackSurfaceAndZeroTrustTab(theme),
+                      _buildPurpleTeamAndForensicsTab(theme),
                       _buildDiagnosticsTab(theme),
                     ],
                   ),
@@ -259,6 +524,9 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
     final activeProbes = _stats?.activeProbes ?? 8;
     final pktsRate = _stats?.packetsPerSec ?? 0.0;
     final bytesRate = _stats?.bytesPerSec ?? 0.0;
+    final openAlerts = _stats?.activeAlerts ?? 0;
+    final nodesMonitored = _stats?.nodesMonitored ?? _nodes.length;
+    final synthPulse = _stats?.syntheticPulse ?? false;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -275,7 +543,6 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -285,22 +552,19 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                 child: const Icon(Icons.grain, color: Color(0xFF06B6D4), size: 22),
               ),
               const SizedBox(width: 14),
-
-              // Title & Subtitle
               Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Wrap(
-                      spacing: 10,
+                      spacing: 8,
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          'eBPF Live Hub & Kernel Observability',
+                          'eBPF Live Hub • Security & Kernel Observability',
                           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        // Mode Badge
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
@@ -327,7 +591,7 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                isKernel ? 'eBPF KERNEL ACTIVE' : 'eBPF EMULATION',
+                                isKernel ? 'eBPF KERNEL ACTIVE' : 'eBPF HYBRID/DEV',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -337,11 +601,28 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                             ],
                           ),
                         ),
+                        if (openAlerts > 0)
+                          InkWell(
+                            onTap: () => _tabController.animateTo(2),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                              ),
+                              child: Text(
+                                '$openAlerts IDS ALERTS',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Kernel $kernelVer • Socket & packet tracing with L4/L7 protocol decoding and service mesh topology.',
+                      'Kernel $kernelVer • $nodesMonitored Centurion(s) • Runtime IDS (MITRE ATT&CK), Zero-Trust, Purple Team & DFIR.',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -350,8 +631,6 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
               ),
             ],
           ),
-
-          // Telemetry Pills + Controls
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -375,10 +654,21 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                 icon: Icons.swap_vert,
                 label: 'Throughput',
                 value: _formatBytesRate(bytesRate),
-                color: theme.brightness == Brightness.dark
-                    ? Colors.tealAccent
-                    : Colors.teal.shade700,
+                color: theme.brightness == Brightness.dark ? Colors.tealAccent : Colors.teal.shade700,
                 theme: theme,
+              ),
+              FilterChip(
+                selected: !synthPulse,
+                label: Text(
+                  synthPulse ? 'Demo Pulse ON' : 'Real Telemetry Only',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+                avatar: Icon(
+                  synthPulse ? Icons.science_outlined : Icons.verified_user_outlined,
+                  size: 14,
+                  color: synthPulse ? Colors.amber : const Color(0xFF10B981),
+                ),
+                onSelected: (_) => _toggleSyntheticPulse(!synthPulse),
               ),
               OutlinedButton.icon(
                 onPressed: _toggleAutoRefresh,
@@ -388,21 +678,19 @@ class _EbpfPageState extends State<EbpfPage> with SingleTickerProviderStateMixin
                   color: _autoRefresh ? const Color(0xFF10B981) : Colors.grey,
                 ),
                 label: Text(
-                  _autoRefresh ? 'Live Tail (2s)' : 'Paused',
+                  _autoRefresh ? 'Live (3s)' : 'Paused',
                   style: TextStyle(color: _autoRefresh ? const Color(0xFF10B981) : null),
                 ),
               ),
               IconButton(
-                tooltip: 'Refresh Now',
+                tooltip: 'Refresh & Scan Nodes',
                 icon: const Icon(Icons.refresh, size: 20),
                 onPressed: _loadAllData,
               ),
-
-              // Simulation Button
               FilledButton.icon(
                 onPressed: _openSimulationDialog,
                 icon: const Icon(Icons.bolt, size: 16),
-                label: const Text('Simulate Traffic'),
+                label: const Text('Simulate'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF06B6D4),
                   foregroundColor: Colors.black,
